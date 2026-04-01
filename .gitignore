@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# WhatsApp session data
+.wwebjs_auth/
+.wwebjs_cache/
+session/
+
+# Message data
+messages/
+chats/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup folders (keep structure but ignore content)
+backup_*/
+messages_backup_*/
+
+# Test outputs
+coverage/
+.nyc_output/

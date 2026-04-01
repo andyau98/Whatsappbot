@@ -1,0 +1,23 @@
+{
+  "name": "msg-extractor",
+  "version": "1.0.0",
+  "description": "WhatsApp 訊息提取與儲存模組",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "whatsapp",
+    "message",
+    "extractor",
+    "backup",
+    "storage"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
