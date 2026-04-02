@@ -287,6 +287,7 @@ const client = new Client({
 
 // 獲取機器人自己的 ID
 let botId = null;
+let botNumber = null;  // 機器人手機號碼
 
 // 當生成 QR Code 時
 client.on('qr', (qr) => {
@@ -301,13 +302,14 @@ client.on('qr', (qr) => {
 client.on('ready', async () => {
     const info = client.info;
     botId = info.wid._serialized;
+    botNumber = info.wid.user;  // 提取手機號碼
 
     printDivider();
     console.log(`[${getTimestamp()}] ✅ WhatsApp 已成功連接並準備就緒！`);
     console.log(`[${getTimestamp()}] 📍 專案根目錄: ${PROJECT_ROOT}`);
     console.log(`[${getTimestamp()}] 🤖 機器人正在運行中...`);
     console.log(`[${getTimestamp()}] 💡 私聊: 直接發送指令`);
-    console.log(`[${getTimestamp()}] 💡 群組: @提及機器人 + 指令`);
+    console.log(`[${getTimestamp()}] 💡 群組: 直接發送指令（無需@提及）`);
     console.log(`[${getTimestamp()}] 🚀 輸入 "start" 開啟工具選單`);
     console.log(`[${getTimestamp()}] 🛑 輸入 "stop" 停止當前聊天的工具`);
     console.log(`[${getTimestamp()}] 🧠 v3.0: 支援自然語言，如「幫我記住這個」`);
@@ -349,40 +351,231 @@ client.on('message_create', async (msg) => {
 
     // 檢查群組 @提及（群組指令需要 @提及）
     const hasMention = msg.mentionedIds && msg.mentionedIds.length > 0;
+    
+    // 檢查是否@機械人自己（而不是@其他用戶）
+    // 注意：msg.mentionedIds 可能包含字串或物件，需要轉換為字串比較
+    const isMentioningBotById = hasMention && botId && msg.mentionedIds.some(id => {
+        const idStr = typeof id === 'string' ? id : (id._serialized || id.toString());
+        return idStr === botId;
+    });
+    
+    // 檢查訊息內容是否包含機械人手機號碼（備用檢測方式）
+    const isMentioningBotByNumber = botNumber && messageBody.includes(botNumber);
+    
+    // 檢查是否只有一個@提及（簡化判斷：如果只有一個@提及，且訊息包含指令，則視為@機械人）
+    // 這是因為 WhatsApp Web.js 的 ID 格式可能與實際顯示的不同
+    const isSingleMention = hasMention && msg.mentionedIds.length === 1;
+    
+    // 綜合判斷是否@機械人
+    const isMentioningBot = isMentioningBotById || isMentioningBotByNumber || isSingleMention;
+    
+    // 調試日誌：顯示 @提及資訊
+    if (chat.isGroup && hasMention) {
+        console.log(`[${getTimestamp()}] 🔍 群組 @提及檢測 [聊天: ${chatId}]`);
+        console.log(`   botId: ${botId}`);
+        console.log(`   botNumber: ${botNumber}`);
+        console.log(`   mentionedIds: ${JSON.stringify(msg.mentionedIds)}`);
+        console.log(`   isMentioningBotById: ${isMentioningBotById}`);
+        console.log(`   isMentioningBotByNumber: ${isMentioningBotByNumber}`);
+        console.log(`   isSingleMention: ${isSingleMention}`);
+        console.log(`   isMentioningBot: ${isMentioningBot}`);
+    }
+
+    // ============================================
+    // 【新增：@機械人時主動發出功能訊息】
+    // ============================================
+    if (chat.isGroup && isMentioningBot) {
+        console.log(`[${getTimestamp()}] 📢 機械人被 @提及 [聊天: ${chatId}]`);
+        
+        // 檢查是否是 @機械人 (Stop) 指令
+        if (messageBody.toLowerCase().includes('stop')) {
+            console.log(`[${getTimestamp()}] 🛑 @機械人 (Stop) 指令 [聊天: ${chatId}]`);
+            
+            // 停止所有功能
+            if (chatManager.hasActivePlugins(chatId)) {
+                const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+                stoppedPlugins.forEach(pluginName => {
+                    pluginManager.removePluginInstance(pluginName, chatId);
+                });
+                await msg.reply('🛑 已停止所有功能');
+                console.log(`[${getTimestamp()}] ✅ 已停止所有功能 [聊天: ${chatId}]`);
+            } else {
+                await msg.reply('ℹ️ 目前無執行中功能');
+            }
+            return;
+        }
+        
+        // 發送功能說明
+        const featureMenu = `🤖 機械人功能說明\n\n請滑動回覆這條訊息來下指令：\n1=自動回覆 2=記錄訊息 3=智能指令 0=停止所有\n\n各工具說明：\n1. 自動回覆 (auto-reply)：自動回覆收到的訊息\n2. 記錄訊息 (msg-extractor)：提取並儲存 WhatsApp 訊息到本地\n3. 智能指令 (smart-command)：支援自然語言操作\n\n也可以直接輸入：\n- start → 開啟工具選單\n- stop → 停止所有功能`;
+        
+        await msg.reply(featureMenu);
+        console.log(`[${getTimestamp()}] ✅ 已發送功能說明 [聊天: ${chatId}]`);
+        return;
+    }
+
+    // ============================================
+    // 【新增：滑動回覆指令處理】
+    // ============================================
+    let isCommandProcessed = false;
+    
+    if (msg.hasQuotedMsg) {
+        try {
+            const quoted = await msg.getQuotedMessage();
+            // 檢查是否是回覆機器人自己的訊息
+            if (quoted.fromMe) {
+                console.log(`[${getTimestamp()}] 💬 收到滑動回覆指令 [聊天: ${chatId}]`);
+                
+                // 解析指令
+                const command = messageBody.trim().toLowerCase();
+                
+                // 處理指令
+                switch (command) {
+                    case '1':
+                    case '自動回覆':
+                        // 啟動自動回覆功能
+                        // 根據工具列表順序，auto-reply 是第 1 個工具（索引 0）
+                        const autoReplyIndex = 0; // 直接使用索引位置
+                        if (autoReplyIndex >= 0 && autoReplyIndex < pluginManager.plugins.length) {
+                            const plugin = await pluginManager.activatePlugin(autoReplyIndex, chatId);
+                            if (plugin) {
+                                chatManager.addActivePlugin(chatId, 'auto-reply');
+                                await msg.reply('✅ 已啟動自動回覆\n\n功能：自動回覆收到的訊息');
+                                console.log(`[${getTimestamp()}] ✅ 已啟動自動回覆功能 [聊天: ${chatId}]`);
+                            } else {
+                                await msg.reply('❌ 啟動自動回覆功能失敗');
+                            }
+                        } else {
+                            await msg.reply('❌ 自動回覆功能不存在');
+                        }
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                        
+                    case '2':
+                    case '記錄':
+                    case '記錄訊息':
+                    case '開始記錄':
+                        // 啟動記錄訊息功能（msg-extractor）
+                        // 根據工具列表順序，msg-extractor 是第 2 個工具（索引 1）
+                        const msgExtractorIndex = 1; // 直接使用索引位置
+                        if (msgExtractorIndex >= 0 && msgExtractorIndex < pluginManager.plugins.length) {
+                            const plugin = await pluginManager.activatePlugin(msgExtractorIndex, chatId);
+                            if (plugin) {
+                                chatManager.addActivePlugin(chatId, 'msg-extractor');
+                                await msg.reply('✅ 已啟動記錄訊息\n\n功能：提取並儲存 WhatsApp 訊息到本地');
+                                console.log(`[${getTimestamp()}] ✅ 已啟動記錄訊息功能 [聊天: ${chatId}]`);
+                            } else {
+                                await msg.reply('❌ 啟動記錄訊息功能失敗');
+                            }
+                        } else {
+                            await msg.reply('❌ 記錄訊息功能不存在');
+                        }
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                        
+                    case '3':
+                    case '智能指令':
+                        // 啟動智能指令功能
+                        // 根據工具列表順序，smart-command 是第 3 個工具（索引 2）
+                        const smartCommandIndex = 2; // 直接使用索引位置
+                        if (smartCommandIndex >= 0 && smartCommandIndex < pluginManager.plugins.length) {
+                            const plugin = await pluginManager.activatePlugin(smartCommandIndex, chatId);
+                            if (plugin) {
+                                chatManager.addActivePlugin(chatId, 'smart-command');
+                                await msg.reply('✅ 已啟動智能指令\n\n功能：支援自然語言操作');
+                                console.log(`[${getTimestamp()}] ✅ 已啟動智能指令功能 [聊天: ${chatId}]`);
+                            } else {
+                                await msg.reply('❌ 啟動智能指令功能失敗');
+                            }
+                        } else {
+                            await msg.reply('❌ 智能指令功能不存在');
+                        }
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                        
+                    case '0':
+                    case '取消':
+                    case '停止':
+                    case '關閉':
+                        // 停止所有功能
+                        if (chatManager.hasActivePlugins(chatId)) {
+                            const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+                            stoppedPlugins.forEach(pluginName => {
+                                pluginManager.removePluginInstance(pluginName, chatId);
+                            });
+                            await msg.reply('🛑 已停止所有功能');
+                            console.log(`[${getTimestamp()}] ✅ 已停止所有功能 [聊天: ${chatId}]`);
+                        } else {
+                            await msg.reply('ℹ️ 目前無執行中功能');
+                        }
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                        
+                    case '狀態':
+                        // 顯示狀態
+                        const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
+                        if (activePlugins.length > 0) {
+                            await msg.reply(`📊 目前執行中功能：\n${activePlugins.map(p => `• ${p}`).join('\n')}`);
+                        } else {
+                            await msg.reply('📊 目前無執行中功能');
+                        }
+                        console.log(`[${getTimestamp()}] ✅ 已顯示狀態 [聊天: ${chatId}]`);
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                        
+                    case '選單':
+                        // 重新顯示功能說明
+                        const featureMenu = `🤖 機械人功能說明\n\n請滑動回覆這條訊息來下指令：\n1=自動回覆 2=記錄訊息 3=智能指令 0=停止所有\n\n各工具說明：\n1. 自動回覆 (auto-reply)：自動回覆收到的訊息\n2. 記錄訊息 (msg-extractor)：提取並儲存 WhatsApp 訊息到本地\n3. 智能指令 (smart-command)：支援自然語言操作\n\n也可以直接輸入：\n- start → 開啟工具選單\n- stop → 停止所有功能`;
+                        await msg.reply(featureMenu);
+                        console.log(`[${getTimestamp()}] ✅ 已重新顯示功能說明 [聊天: ${chatId}]`);
+                        // 重置等待選擇狀態，避免觸發工具選擇處理
+                        chatManager.setWaitingForSelection(chatId, false);
+                        isCommandProcessed = true;
+                        return;
+                }
+            }
+        } catch (error) {
+            console.error(`[${getTimestamp()}] ❌ 處理滑動回覆失敗:`, error.message);
+        }
+    }
+    
+    // 如果是指令消息，跳過後續工具處理
+    if (isCommandProcessed) {
+        return;
+    }
 
     // ============================================
     // 【指令處理區】
     // ============================================
 
-    // 處理 "start" 指令 - 顯示工具選單（群組需要 @提及）
-    if (messageBody.toLowerCase() === 'start' || messageBody.toLowerCase().includes('start')) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息但未 @提及，只顯示不回覆`);
+    // 處理 "start" 指令 - 顯示工具選單
+    // 群組中必須 @機械人才會回應
+    if (!chat.isGroup || isMentioningBot) {
+        if (messageBody.toLowerCase() === 'start' || messageBody.toLowerCase().includes('start')) {
+            console.log(`[${getTimestamp()}] 🚀 用戶請求工具選單 [聊天: ${chatId}]`);
+
+            const pluginList = pluginManager.getPluginList();
+            await msg.reply(pluginList);
+
+            // 設置這個聊天的等待選擇狀態
+            chatManager.setWaitingForSelection(chatId, true);
+
+            console.log(`[${getTimestamp()}] ✅ 已發送工具列表 [聊天: ${chatId}]`);
             return;
         }
-
-        console.log(`[${getTimestamp()}] 🚀 用戶請求工具選單 [聊天: ${chatId}]`);
-
-        const pluginList = pluginManager.getPluginList();
-        await msg.reply(pluginList);
-
-        // 設置這個聊天的等待選擇狀態
-        chatManager.setWaitingForSelection(chatId, true);
-
-        console.log(`[${getTimestamp()}] ✅ 已發送工具列表 [聊天: ${chatId}]`);
-        return;
     }
 
     // 處理工具選擇（每個聊天獨立）
     if (chatManager.isWaitingForSelection(chatId)) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組選擇工具但未 @提及，取消選擇狀態 [聊天: ${chatId}]`);
-            chatManager.setWaitingForSelection(chatId, false);
-            return;
-        }
-
         // 提取數字（只匹配 0-9 的單個數字，避免匹配長數字 ID）
         const numericMatch = messageBody.match(/\b[0-9]\b/);
         const selection = numericMatch ? parseInt(numericMatch[0]) : NaN;
@@ -434,31 +627,28 @@ client.on('message_create', async (msg) => {
     }
 
     // 處理 "stop" 指令 - 停止當前聊天的工具
-    if (messageBody.toLowerCase() === 'stop' || messageBody.toLowerCase().includes('stop')) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息但未 @提及，只顯示不回覆`);
+    // 群組中必須 @機械人才會回應
+    if (!chat.isGroup || isMentioningBot) {
+        if (messageBody.toLowerCase() === 'stop' || messageBody.toLowerCase().includes('stop')) {
+            console.log(`[${getTimestamp()}] 🛑 用戶請求停止工具 [聊天: ${chatId}]`);
+
+            // 停止這個聊天的所有活動工具
+            if (chatManager.hasActivePlugins(chatId)) {
+                const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+                
+                // 清理工具實例
+                stoppedPlugins.forEach(pluginName => {
+                    pluginManager.removePluginInstance(pluginName, chatId);
+                });
+                
+                await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
+                console.log(`[${getTimestamp()}] ✅ 已停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
+            } else {
+                await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
+                console.log(`[${getTimestamp()}] ℹ️ 當前聊天沒有運行中的工具 [聊天: ${chatId}]`);
+            }
             return;
         }
-
-        console.log(`[${getTimestamp()}] 🛑 用戶請求停止工具 [聊天: ${chatId}]`);
-
-        // 停止這個聊天的所有活動工具
-        if (chatManager.hasActivePlugins(chatId)) {
-            const stoppedPlugins = chatManager.stopAllPlugins(chatId);
-            
-            // 清理工具實例
-            stoppedPlugins.forEach(pluginName => {
-                pluginManager.removePluginInstance(pluginName, chatId);
-            });
-            
-            await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
-            console.log(`[${getTimestamp()}] ✅ 已停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
-        } else {
-            await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
-            console.log(`[${getTimestamp()}] ℹ️ 當前聊天沒有運行中的工具 [聊天: ${chatId}]`);
-        }
-        return;
     }
 
     // ============================================
@@ -494,12 +684,6 @@ client.on('message_create', async (msg) => {
     const parseResult = smartCommand.parse(messageBody);
     
     if (parseResult.matched) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息但未 @提及，只顯示不回覆`);
-            return;
-        }
-        
         console.log(`[${getTimestamp()}] 🧠 智能指令識別: ${parseResult.command} [聊天: ${chatId}]`);
         
         // 根據識別的指令執行對應操作
@@ -580,12 +764,6 @@ client.on('message_create', async (msg) => {
 
     // 指令：!test（系統測試指令）
     if (messageBody === '!test' || messageBody.includes('!test')) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息但未 @提及，只顯示不回覆`);
-            return;
-        }
-
         console.log(`[${getTimestamp()}] 📝 處理 !test 指令 [聊天: ${chatId}]`);
 
         try {
