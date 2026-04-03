@@ -455,38 +455,6 @@ client.on('message_create', async (msg) => {
         return;
     }
 
-    // Gemini CLI 指令處理
-    if (messageBody.startsWith('/gemini ') || messageBody.startsWith('/ai ')) {
-        const prompt = messageBody.replace(/^\/gemini\s+|^\/ai\s+/, '');
-        
-        if (!prompt) {
-            await msg.reply('💡 用法: /gemini 你的問題\n例如: /gemini 香港今天天氣如何？');
-            return;
-        }
-
-        try {
-            console.log(`[${getTimestamp()}] 🤖 Gemini 請求: ${prompt.substring(0, 50)}... [聊天: ${chatId}]`);
-            await msg.reply('🤔 Gemini 正在思考...');
-            
-            const GeminiCliTool = require('../tools/gemini-cli/r2');
-            const geminiTool = new GeminiCliTool({ verbose: false, timeout: 120 });
-            const response = await geminiTool.askGemini(prompt);
-            
-            // 限制回應長度
-            let replyText = `🤖 *Gemini AI*\n\n${response}`;
-            if (replyText.length > 4000) {
-                replyText = replyText.substring(0, 3900) + '\n\n... (訊息已截斷)';
-            }
-            
-            await msg.reply(replyText);
-            console.log(`[${getTimestamp()}] ✅ Gemini 回應完成 [聊天: ${chatId}]`);
-        } catch (error) {
-            console.error(`[${getTimestamp()}] ❌ Gemini 錯誤:`, error.message);
-            await msg.reply(`❌ Gemini 請求失敗: ${error.message}\n\n請確保:\n1. 已安裝 Browser Bridge 擴充功能\n2. Chrome 已開啟並登入 Google 帳號`);
-        }
-        return;
-    }
-
     // 工具訊息處理
     if (chatManager.hasActivePlugins(chatId)) {
         for (const pluginName of chatManager.getActivePlugins(chatId)) {
