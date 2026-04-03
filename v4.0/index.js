@@ -455,6 +455,38 @@ client.on('message_create', async (msg) => {
         return;
     }
 
+    // 豆包 AI 指令處理
+    if (messageBody.startsWith('/doubao ') || messageBody.startsWith('/db ')) {
+        const prompt = messageBody.replace(/^\/doubao\s+|^\/db\s+/, '');
+        
+        if (!prompt) {
+            await msg.reply('💡 用法: /doubao 你的問題\n例如: /doubao 香港今天天氣如何？');
+            return;
+        }
+
+        try {
+            console.log(`[${getTimestamp()}] 🤖 豆包 AI 請求: ${prompt.substring(0, 50)}... [聊天: ${chatId}]`);
+            await msg.reply('🤔 豆包正在思考...');
+            
+            const DoubaoAiTool = require('../tools/doubao-ai/r1');
+            const doubaoTool = new DoubaoAiTool({ verbose: false, timeout: 30000 });
+            const response = await doubaoTool.ask(prompt);
+            
+            // 限制回應長度
+            let replyText = `🤖 *豆包 AI*\n\n${response}`;
+            if (replyText.length > 4000) {
+                replyText = replyText.substring(0, 3900) + '\n\n... (訊息已截斷)';
+            }
+            
+            await msg.reply(replyText);
+            console.log(`[${getTimestamp()}] ✅ 豆包 AI 回應完成 [聊天: ${chatId}]`);
+        } catch (error) {
+            console.error(`[${getTimestamp()}] ❌ 豆包 AI 錯誤:`, error.message);
+            await msg.reply(`❌ 豆包 AI 請求失敗: ${error.message}\n\n請確保:\n1. OpenCLI 已正確安裝\n2. 豆包 (doubao-app) 已配置`);
+        }
+        return;
+    }
+
     // 工具訊息處理
     if (chatManager.hasActivePlugins(chatId)) {
         for (const pluginName of chatManager.getActivePlugins(chatId)) {

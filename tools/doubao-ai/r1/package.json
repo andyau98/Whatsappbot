@@ -1,0 +1,12 @@
+{
+  "name": "doubao-ai-tool",
+  "version": "1.0.0",
+  "description": "Doubao AI Tool using OpenCLI",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js '你好'"
+  },
+  "keywords": ["doubao", "ai", "opencli"],
+  "author": "",
+  "license": "MIT"
+}
