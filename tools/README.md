@@ -96,6 +96,34 @@ node index.js
 
 ---
 
+### 4. weather（天氣查詢工具）
+
+【功能說明】
+查詢香港及全球天氣資訊，支援智能指令觸發。
+
+**特點：**
+- ✅ 查詢當前天氣和 3 天預報
+- ✅ 支援全球主要城市
+- ✅ 中文顯示
+- ✅ 智能指令觸發（「今天天氣如何」、「香港天氣」）
+- ✅ 免費 API (wttr.in)
+
+**使用方式：**
+```bash
+cd tools/weather
+node index.js "Hong Kong"
+```
+
+**智能指令範例：**
+- "今天天氣如何" → 查詢香港天氣
+- "香港天氣" → 查詢香港天氣
+- "台北天氣怎樣" → 查詢台北天氣
+- "weather in Tokyo" → 查詢東京天氣
+
+**詳細說明：** [weather/README.md](./weather/README.md)
+
+---
+
 ## 🔧 工具開發規範
 
 ### 新增工具的步驟：
@@ -163,7 +191,11 @@ Whatsappbot/
 │   │   ├── index.js
 │   │   ├── package.json
 │   │   └── README.md
-│   └── smart-command/    # 智能指令解析器 (v3.0)
+│   ├── smart-command/    # 智能指令解析器 (v3.0)
+│       ├── index.js
+│       ├── package.json
+│       └── README.md
+│   └── weather/          # 天氣查詢工具
 │       ├── index.js
 │       ├── package.json
 │       └── README.md

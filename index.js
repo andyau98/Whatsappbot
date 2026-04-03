@@ -755,6 +755,49 @@ client.on('message_create', async (msg) => {
                 }
                 console.log(`[${getTimestamp()}] ✅ 智能顯示狀態 [聊天: ${chatId}]`);
                 return;
+
+            case 'weather':
+                // 載入天氣工具
+                const WeatherTool = require('./tools/weather');
+                const weatherTool = new WeatherTool({ verbose: false });
+                
+                // 嘗試從訊息中提取城市名稱
+                let city = 'Hong Kong';
+                const cityPatterns = [
+                    /(香港|台北|東京|倫敦|北京|上海|廣州|深圳|新加坡|紐約|巴黎|悉尼)/,
+                    /weather\s+(?:in|at|for)\s+(\w+)/i,
+                    /(\w+)\s+weather/i
+                ];
+                
+                for (const pattern of cityPatterns) {
+                    const match = messageBody.match(pattern);
+                    if (match) {
+                        const cityMap = {
+                            '香港': 'Hong Kong',
+                            '台北': 'Taipei',
+                            '東京': 'Tokyo',
+                            '倫敦': 'London',
+                            '北京': 'Beijing',
+                            '上海': 'Shanghai',
+                            '廣州': 'Guangzhou',
+                            '深圳': 'Shenzhen',
+                            '新加坡': 'Singapore'
+                        };
+                        city = cityMap[match[1]] || match[1];
+                        break;
+                    }
+                }
+                
+                try {
+                    await msg.reply(`🌤️ 正在查詢 ${city} 的天氣...`);
+                    const weatherInfo = await weatherTool.run(city);
+                    await msg.reply(weatherInfo);
+                    console.log(`[${getTimestamp()}] ✅ 智能查詢天氣: ${city} [聊天: ${chatId}]`);
+                } catch (error) {
+                    await msg.reply(`❌ 查詢天氣失敗: ${error.message}`);
+                    console.error(`[${getTimestamp()}] ❌ 天氣查詢失敗:`, error.message);
+                }
+                return;
         }
     }
 

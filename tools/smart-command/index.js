@@ -125,6 +125,25 @@ const COMMAND_PATTERNS = {
             /狀態.*如何/
         ],
         negativeKeywords: []
+    },
+
+    // 天氣查詢的各種說法
+    'weather': {
+        keywords: [
+            '天氣', '氣溫', '溫度', '下雨', '晴天',
+            '天氣如何', '今天天氣', '明天天氣',
+            'weather', 'temperature', 'forecast',
+            'weather today', 'weather tomorrow'
+        ],
+        patterns: [
+            /(查詢|看|問).*天氣/,
+            /天氣.*(如何|怎樣|好嗎)/,
+            /(今天|明天|後天).*天氣/,
+            /(香港|台北|東京|倫敦).*天氣/,
+            /weather\s+(in|at|for)/i,
+            /(how|what).*(weather|temperature)/i
+        ],
+        negativeKeywords: []
     }
 };
 
@@ -265,7 +284,8 @@ class SmartCommand {
             'auto-reply': '好的，自動回覆功能已啟動。',
             'stop': '已停止所有功能。',
             'start': '這是目前可用的功能列表...',
-            'status': '讓我查看一下目前的狀態...'
+            'status': '讓我查看一下目前的狀態...',
+            'weather': '正在查詢天氣資訊...'
         };
 
         return responses[parseResult.command] || '指令已識別。';
@@ -306,6 +326,10 @@ class SmartCommand {
         console.log('📋 其他：');
         console.log('   • "顯示選單" - 查看所有功能');
         console.log('   • "查看狀態" - 了解目前運作情況');
+        console.log('');
+        console.log('🌤️ 天氣查詢：');
+        console.log('   • "今天天氣如何" - 查詢天氣');
+        console.log('   • "香港天氣" - 查詢特定城市天氣');
         console.log('');
     }
 }
