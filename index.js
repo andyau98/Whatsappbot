@@ -309,10 +309,11 @@ client.on('ready', async () => {
     console.log(`[${getTimestamp()}] 📍 專案根目錄: ${PROJECT_ROOT}`);
     console.log(`[${getTimestamp()}] 🤖 機器人正在運行中...`);
     console.log(`[${getTimestamp()}] 💡 私聊: 直接發送指令`);
-    console.log(`[${getTimestamp()}] 💡 群組: 直接發送指令（無需@提及）`);
+    console.log(`[${getTimestamp()}] 💡 群組: 必須 @機器人 或滑動回覆機器人訊息`);
     console.log(`[${getTimestamp()}] 🚀 輸入 "start" 開啟工具選單`);
     console.log(`[${getTimestamp()}] 🛑 輸入 "stop" 停止當前聊天的工具`);
     console.log(`[${getTimestamp()}] 🧠 v3.0: 支援自然語言，如「幫我記住這個」`);
+    console.log(`[${getTimestamp()}] 🌤️ 天氣查詢: 「今天天氣如何」、「香港天氣」`);
     printDivider();
 });
 
@@ -551,6 +552,33 @@ client.on('message_create', async (msg) => {
     // 如果是指令消息，跳過後續工具處理
     if (isCommandProcessed) {
         return;
+    }
+
+    // ============================================
+    // 【群組指令權限檢查】
+    // ============================================
+    // 在群組中，所有指令都需要 @機器人 或滑動回覆機器人的訊息
+    if (chat.isGroup) {
+        // 檢查是否是滑動回覆機器人的訊息
+        let isReplyToBot = false;
+        if (msg.hasQuotedMsg) {
+            try {
+                const quoted = await msg.getQuotedMessage();
+                if (quoted.fromMe) {
+                    isReplyToBot = true;
+                }
+            } catch (error) {
+                console.error(`[${getTimestamp()}] ❌ 檢查滑動回覆失敗:`, error.message);
+            }
+        }
+        
+        // 如果不是 @機器人 也不是滑動回覆機器人的訊息，則忽略
+        if (!isMentioningBot && !isReplyToBot) {
+            console.log(`[${getTimestamp()}] ℹ️ 群組訊息未 @機器人，忽略指令 [聊天: ${chatId}]`);
+            return;
+        }
+        
+        console.log(`[${getTimestamp()}] ✅ 群組指令已授權 (@機器人或滑動回覆) [聊天: ${chatId}]`);
     }
 
     // ============================================
