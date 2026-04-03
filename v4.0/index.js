@@ -290,13 +290,14 @@ client.on('message_create', async (msg) => {
         // 群組中不處理 # 指令（只有私聊可用）
         if (chat.isGroup) {
             console.log(`[${getTimestamp()}] ℹ️ 群組中忽略 # 指令 [聊天: ${chatId}]`);
+            await msg.reply('🤖 *豆包 AI* 僅在私聊中可用\n\n💡 請私聊機器人使用 #你的問題\n💡 群組中請使用 !start 查看機器人功能');
             return;
         }
 
         const prompt = messageBody.substring(1).trim();
         
         if (!prompt) {
-            await msg.reply('💡 用法: #你的問題\n例如: #香港今天天氣如何？');
+            await msg.reply('🤖 *豆包 AI*\n\n💡 用法: #你的問題\n例如: #香港今天天氣如何？\n例如: #講個笑話\n\n💡 輸入 !start 查看機器人功能');
             return;
         }
 
@@ -309,16 +310,16 @@ client.on('message_create', async (msg) => {
             const response = await doubaoTool.ask(prompt);
             
             // 限制回應長度
-            let replyText = `🤖 *豆包 AI*\n\n${response}`;
+            let replyText = `🤖 *豆包 AI*\n\n${response}\n\n---\n💡 繼續問: #你的問題\n💡 機器人功能: !start`;
             if (replyText.length > 4000) {
-                replyText = replyText.substring(0, 3900) + '\n\n... (訊息已截斷)';
+                replyText = replyText.substring(0, 3900) + '\n\n... (訊息已截斷)\n\n---\n💡 繼續問: #你的問題\n💡 機器人功能: !start';
             }
             
             await msg.reply(replyText);
             console.log(`[${getTimestamp()}] ✅ 豆包 AI 回應完成 [聊天: ${chatId}]`);
         } catch (error) {
             console.error(`[${getTimestamp()}] ❌ 豆包 AI 錯誤:`, error.message);
-            await msg.reply(`❌ 豆包 AI 請求失敗: ${error.message}\n\n請確保:\n1. OpenCLI 已正確安裝\n2. 豆包 (doubao-app) 已配置`);
+            await msg.reply(`❌ 豆包 AI 請求失敗: ${error.message}\n\n請確保:\n1. OpenCLI 已正確安裝\n2. 豆包 (doubao-app) 已配置\n\n💡 輸入 !start 使用機器人功能`);
         }
         return;
     }
@@ -331,12 +332,12 @@ client.on('message_create', async (msg) => {
         async function sendToolMenu() {
             const sentMessages = [];
             try {
-                await msg.reply('🤖 *機器人功能選單*\n\n📖 請輸入指令使用：\n• !start - 顯示選單\n• !stop - 停止所有功能\n• !狀態 - 查看狀態\n• !選單 - 顯示選單');
+                await msg.reply('🤖 *機器人功能選單* (v4.2)\n\n📖 *指令說明*\n• !start - 顯示選單\n• !stop - 停止所有功能\n• !狀態 - 查看狀態\n• !工具名 - 啟動工具\n\n🤖 *豆包 AI* (私聊限定)\n• #你的問題 - 問豆包 AI');
 
                 for (let i = 0; i < pluginManager.plugins.length; i++) {
                     const plugin = pluginManager.plugins[i];
                     try {
-                        const toolMessage = `\n${i + 1}. *${plugin.name}*\n   ${plugin.description}\n   💡 輸入 !${plugin.name} 直接使用`;
+                        const toolMessage = `\n${i + 1}. *${plugin.name}*\n   ${plugin.description}\n   💡 輸入 !${plugin.name} 啟動`;
                         const sentMessage = await msg.reply(toolMessage);
                         if (sentMessage?.id) {
                             chatManager.trackMessage(sentMessage.id._serialized, plugin.name, chatId);
@@ -371,9 +372,9 @@ client.on('message_create', async (msg) => {
                             console.error(`[${getTimestamp()}] ❌ 清理實例失敗 ${name}:`, e.message);
                         }
                     });
-                    await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
+                    await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}\n\n💡 輸入 !start 查看選單`);
                 } else {
-                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
+                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具\n\n💡 輸入 !start 查看選單');
                 }
             } catch (error) {
                 console.error(`[${getTimestamp()}] ❌ 停止工具失敗:`, error.message);
@@ -385,9 +386,9 @@ client.on('message_create', async (msg) => {
         if (botCommand === '狀態' || botCommand === 'status') {
             const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
             if (activePlugins.length > 0) {
-                await msg.reply(`📊 目前執行中功能：\n${activePlugins.map(p => `• ${p}`).join('\n')}`);
+                await msg.reply(`📊 目前執行中功能：\n${activePlugins.map(p => `• ${p}`).join('\n')}\n\n💡 輸入 !stop 停止所有功能`);
             } else {
-                await msg.reply('📊 目前無執行中功能');
+                await msg.reply('📊 目前無執行中功能\n\n💡 輸入 !start 查看選單');
             }
             return;
         }
@@ -399,20 +400,20 @@ client.on('message_create', async (msg) => {
                 const plugin = await pluginManager.activatePlugin(pluginIndex, chatId);
                 if (plugin?.instance) {
                     chatManager.addActivePlugin(chatId, pluginManager.plugins[pluginIndex].name);
-                    await msg.reply(`✅ 已啟動 ${pluginManager.plugins[pluginIndex].name}\n\n功能：${plugin.description}\n\n💡 現在可以直接輸入指令使用此工具`);
+                    await msg.reply(`✅ 已啟動 *${pluginManager.plugins[pluginIndex].name}*\n\n📋 功能：${plugin.description}\n\n💡 輸入 !狀態 查看運行狀態\n💡 輸入 !stop 停止工具`);
                     console.log(`[${getTimestamp()}] ✅ 啟動工具成功: ${pluginManager.plugins[pluginIndex].name} [聊天: ${chatId}]`);
                 } else {
-                    await msg.reply(`❌ 啟動 ${botCommand} 失敗：工具實例創建失敗`);
+                    await msg.reply(`❌ 啟動 ${botCommand} 失敗：工具實例創建失敗\n\n💡 輸入 !start 查看可用工具`);
                 }
             } catch (error) {
-                await msg.reply(`❌ 啟動 ${botCommand} 失敗：${error.message}`);
+                await msg.reply(`❌ 啟動 ${botCommand} 失敗：${error.message}\n\n💡 輸入 !start 查看可用工具`);
                 console.error(`[${getTimestamp()}] ❌ 啟動 ${botCommand} 失敗:`, error.message);
             }
             return;
         }
 
         // 未知指令
-        await msg.reply(`❓ 未知指令: !${botCommand}\n\n可用指令:\n• !start - 顯示選單\n• !stop - 停止功能\n• !狀態 - 查看狀態`);
+        await msg.reply(`❓ 未知指令: *!${botCommand}*\n\n📖 *可用指令*\n• !start - 顯示選單\n• !stop - 停止功能\n• !狀態 - 查看狀態\n• !工具名 - 啟動工具\n\n🤖 *豆包 AI* (私聊限定)\n• #你的問題 - 問豆包 AI`);
         return;
     }
 
