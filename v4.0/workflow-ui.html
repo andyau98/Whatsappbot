@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot v4.0 - 指令邏輯工作流程圖</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        
+        .workflow-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .step-number {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: white;
+            flex-shrink: 0;
+            margin-right: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .step-content {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 5px solid;
+        }
+        
+        .step-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .step-description {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .step-code {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        
+        /* 不同類型的步驟顏色 */
+        .type-receive { background: #4299e1; }
+        .type-receive + .step-content { border-left-color: #4299e1; }
+        
+        .type-detect { background: #ed8936; }
+        .type-detect + .step-content { border-left-color: #ed8936; }
+        
+        .type-process { background: #48bb78; }
+        .type-process + .step-content { border-left-color: #48bb78; }
+        
+        .type-reply { background: #9f7aea; }
+        .type-reply + .step-content { border-left-color: #9f7aea; }
+        
+        .type-special { background: #e53e3e; }
+        .type-special + .step-content { border-left-color: #e53e3e; }
+        
+        .arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #cbd5e0;
+            margin: 10px 0;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .decision-box {
+            background: #fff5f5;
+            border: 2px solid #fc8181;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .decision-title {
+            font-weight: bold;
+            color: #c53030;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .decision-branches {
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .branch {
+            flex: 1;
+            min-width: 200px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .branch-yes {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+        
+        .branch-no {
+            border-color: #fc8181;
+            background: #fff5f5;
+        }
+        
+        .flowchart-svg {
+            width: 100%;
+            max-width: 1200px;
+            margin: 30px auto;
+            display: block;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .feature-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+        
+        .feature-list {
+            list-style: none;
+            color: #4a5568;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-list li:before {
+            content: "✓ ";
+            color: #48bb78;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+            .flow-step {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .step-number {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 WhatsApp Bot v4.0</h1>
+        <p class="subtitle">指令邏輯工作流程圖與系統架構</p>
+        
+        <!-- 圖例 -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4299e1;"></div>
+                <span>接收訊息</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ed8936;"></div>
+                <span>檢測判斷</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #48bb78;"></div>
+                <span>處理執行</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #9f7aea;"></div>
+                <span>發送回應</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e53e3e;"></div>
+                <span>特殊流程</span>
+            </div>
+        </div>
+        
+        <!-- 主要工作流程 -->
+        <div class="workflow-container">
+            <h2 style="margin-bottom: 30px; color: #2d3748;">📊 主要工作流程</h2>
+            
+            <!-- 步驟 1: 接收訊息 -->
+            <div class="flow-step">
+                <div class="step-number type-receive">1</div>
+                <div class="step-content">
+                    <div class="step-title">接收用戶訊息</div>
+                    <div class="step-description">
+                        監聽 WhatsApp 訊息事件，獲取訊息內容、聊天 ID、發送者資訊
+                    </div>
+                    <div class="step-code">
+client.on('message_create', async (msg) => {
+    const chat = await msg.getChat();
+    const chatId = chat.id._serialized;
+    const messageBody = msg.body.trim();
+    console.log(`[${getTimestamp()}] 📩 收到訊息 [聊天: ${chatId}]`);
+});
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 2: 檢測滑動回覆 -->
+            <div class="flow-step">
+                <div class="step-number type-detect">2</div>
+                <div class="step-content">
+                    <div class="step-title">檢測滑動回覆類型</div>
+                    <div class="step-description">
+                        判斷訊息是否為滑動回覆，以及回覆的對象是機器人還是其他人
+                    </div>
+                    <div class="step-code">
+if (msg.hasQuotedMsg) {
+    const quoted = await msg.getQuotedMessage();
+    const isReplyToBot = quoted.fromMe;
+    const isReplyToOther = !quoted.fromMe;
+    
+    if (isReplyToBot) testType = 1;      // 滑動回覆機器人
+    else if (isReplyToOther) testType = 2; // 滑動回覆其他人
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 3: 智能指令優先處理 -->
+            <div class="flow-step">
+                <div class="step-number type-special">3</div>
+                <div class="step-content">
+                    <div class="step-title">🧠 智能指令優先處理（v4.0 新增）</div>
+                    <div class="step-description">
+                        <strong>在群組授權檢查之前</strong>，先處理天氣查詢等智能指令<br>
+                        這樣用戶可以直接輸入「今天天氣如何」而無需滑動回覆
+                    </div>
+                    <div class="step-code">
+// 智能指令解析 - 優先處理
+const SmartCommand = require('./tools/smart-command');
+const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
+const parseResult = smartCommand.parse(messageBody);
+
+// 如果是天氣查詢指令，直接處理（無需滑動回覆）
+if (parseResult.matched && parseResult.command === 'weather') {
+    console.log(`🧠 智能識別天氣查詢（無需滑動回覆）`);
+    // 執行天氣查詢...
+    return;
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 決策點: 群組授權檢查 -->
+            <div class="decision-box">
+                <div class="decision-title">🔒 群組指令授權檢查</div>
+                <div class="step-description" style="margin-bottom: 15px;">
+                    在群組中，只有以下情況才處理指令：
+                </div>
+                <div class="decision-branches">
+                    <div class="branch branch-yes">
+                        <strong>✅ 授權通過</strong><br>
+                        • 滑動回覆機器人訊息<br>
+                        • start / stop 指令<br>
+                        • 天氣查詢（已在上方處理）
+                    </div>
+                    <div class="branch branch-no">
+                        <strong>❌ 授權失敗</strong><br>
+                        • 未滑動回覆機器人<br>
+                        • 忽略指令，不處理<br>
+                        • 返回，不執行後續邏輯
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 4: 滑動回覆處理 -->
+            <div class="flow-step">
+                <div class="step-number type-process">4</div>
+                <div class="step-content">
+                    <div class="step-title">處理滑動回覆指令</div>
+                    <div class="step-description">
+                        檢查滑動回覆的是哪個工具的訊息，直接啟動對應工具（無需輸入數字）
+                    </div>
+                    <div class="step-code">
+if (msg.hasQuotedMsg && quoted.fromMe) {
+    const quotedMessageId = quoted.id._serialized;
+    const toolName = chatManager.getToolByMessageId(quotedMessageId);
+    
+    // v4.0: 滑動工具訊息直接啟動工具（無需輸入數字）
+    if (toolName) {
+        if (toolName === '主頁') {
+            await sendToolMenu(msg, chatId);  // 返回主頁
+        } else if (toolName === '停止') {
+            // 停止所有功能
+        } else {
+            // 啟動對應工具
+            const pluginIndex = pluginManager.plugins.findIndex(p => p.name === toolName);
+            const plugin = await pluginManager.activatePlugin(pluginIndex, chatId);
+        }
+    }
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 5: 指令處理 -->
+            <div class="flow-step">
+                <div class="step-number type-process">5</div>
+                <div class="step-content">
+                    <div class="step-title">處理一般指令</div>
+                    <div class="step-description">
+                        處理 start、stop、狀態、選單等指令
+                    </div>
+                    <div class="step-code">
+// 處理 "start" 指令 - 顯示工具選單
+if (messageBody.toLowerCase() === 'start') {
+    await sendToolMenu(msg, chatId);  // v4.0: 分開訊息發送
+    return;
+}
+
+// 處理 "stop" 指令 - 停止所有功能
+if (messageBody.toLowerCase() === 'stop') {
+    const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+    await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
+    return;
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 6: 智能指令解析 -->
+            <div class="flow-step">
+                <div class="step-number type-process">6</div>
+                <div class="step-content">
+                    <div class="step-title">智能指令解析（v3.0）</div>
+                    <div class="step-description">
+                        使用自然語言解析用戶意圖，自動轉換為系統指令
+                    </div>
+                    <div class="step-code">
+// 載入 SmartCommand 工具
+const SmartCommand = require('./tools/smart-command');
+const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
+
+// 解析用戶輸入
+const parseResult = smartCommand.parse(messageBody);
+
+if (parseResult.matched) {
+    switch (parseResult.command) {
+        case 'msg-extractor': /* 啟動記錄訊息 */ break;
+        case 'auto-reply':    /* 啟動自動回覆 */ break;
+        case 'start':         /* 顯示選單 */ break;
+        case 'status':        /* 顯示狀態 */ break;
+        // case 'weather':    /* 已在上方處理 */
+    }
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 7: 工具訊息處理 -->
+            <div class="flow-step">
+                <div class="step-number type-process">7</div>
+                <div class="step-content">
+                    <div class="step-title">工具訊息處理</div>
+                    <div class="step-description">
+                        將訊息傳遞給已啟動的工具處理
+                    </div>
+                    <div class="step-code">
+// 檢查這個聊天是否有活動的工具
+if (chatManager.hasActivePlugins(chatId)) {
+    const activePlugins = chatManager.getActivePlugins(chatId);
+    
+    for (const pluginName of activePlugins) {
+        const pluginData = pluginManager.getPluginInstance(pluginName, chatId);
+        
+        if (pluginData && pluginData.instance && pluginData.instance.processMessage) {
+            await pluginData.instance.processMessage(msg);
+        }
+    }
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">⬇️</div>
+            
+            <!-- 步驟 8: 預設處理 -->
+            <div class="flow-step">
+                <div class="step-number type-reply">8</div>
+                <div class="step-content">
+                    <div class="step-title">預設處理與回應</div>
+                    <div class="step-description">
+                        處理其他訊息或顯示提示
+                    </div>
+                    <div class="step-code">
+// 指令：!test（系統測試指令）
+if (messageBody === '!test') {
+    await msg.reply('已連接，可互動');
+    return;
+}
+
+// 其他訊息 - 只顯示不處理
+console.log(`[${getTimestamp()}] ℹ️ 訊息已顯示，等待後續處理 [聊天: ${chatId}]`);
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- v4.0 新功能特色 -->
+        <div class="workflow-container">
+            <h2 style="margin-bottom: 30px; color: #2d3748;">✨ v4.0 新功能特色</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-title">🎯 分開訊息發送</div>
+                    <ul class="feature-list">
+                        <li>每個工具獨立訊息顯示</li>
+                        <li>更清晰的功能選單</li>
+                        <li>避免訊息過長被截斷</li>
+                        <li>支援訊息追蹤系統</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">👆 滑動關聯功能</div>
+                    <ul class="feature-list">
+                        <li>滑動工具訊息直接啟動</li>
+                        <li>無需輸入數字或指令</li>
+                        <li>主頁/停止快速操作</li>
+                        <li>訊息 ID 追蹤對應工具</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🏠 群組/私聊區分</div>
+                    <ul class="feature-list">
+                        <li>群組需滑動回覆機器人</li>
+                        <li>私聊可直接輸入指令</li>
+                        <li>天氣查詢無需滑動回覆</li>
+                        <li>授權檢查機制</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🧠 智能指令優先</div>
+                    <ul class="feature-list">
+                        <li>天氣查詢優先處理</li>
+                        <li>無需滑動即可查詢</li>
+                        <li>自然語言識別</li>
+                        <li>群組授權前處理</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 使用說明 -->
+        <div class="workflow-container">
+            <h2 style="margin-bottom: 30px; color: #2d3748;">📱 使用說明</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-title">🚀 快速開始</div>
+                    <ul class="feature-list">
+                        <li>輸入 "start" 開啟工具選單</li>
+                        <li>滑動工具訊息直接使用</li>
+                        <li>輸入 "stop" 停止所有功能</li>
+                        <li>輸入 "狀態" 查看運行中工具</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🌤️ 天氣查詢</div>
+                    <ul class="feature-list">
+                        <li>「今天天氣如何」- 查詢天氣</li>
+                        <li>「香港天氣」- 指定城市</li>
+                        <li>「台北天氣」- 支援多城市</li>
+                        <li>無需滑動回覆即可查詢</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">👥 群組使用</div>
+                    <ul class="feature-list">
+                        <li>滑動回覆機器人訊息</li>
+                        <li>天氣查詢可直接輸入</li>
+                        <li>start/stop 所有人可用</li>
+                        <li>其他指令需滑動回覆</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">💬 私聊使用</div>
+                    <ul class="feature-list">
+                        <li>直接輸入指令即可</li>
+                        <li>無需滑動回覆</li>
+                        <li>支援所有智能指令</li>
+                        <li>更簡便的操作方式</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

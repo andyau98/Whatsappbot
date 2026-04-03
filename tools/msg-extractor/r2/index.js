@@ -313,6 +313,9 @@ class MessageExtractor {
             const buffer = Buffer.from(media.data, 'base64');
             fs.writeFileSync(filepath, buffer);
             
+            // 複製到網路位置 V:\WhatsappBot\Media
+            await this.copyToNetworkLocation(buffer, filename, msg, messageData);
+            
             // 更新訊息資料
             messageData.mediaFile = filename;
             messageData.mediaType = media.mimetype;
@@ -322,6 +325,41 @@ class MessageExtractor {
             
         } catch (error) {
             console.error(`[${getTimestamp()}] ❌ 儲存媒體失敗:`, error.message);
+        }
+    }
+
+    /**
+     * 複製媒體到網路位置
+     */
+    async copyToNetworkLocation(buffer, originalFilename, msg, messageData) {
+        try {
+            const networkPath = 'V:\\WhatsappBot\\Media';
+            
+            // 確保網路資料夾存在
+            ensureDirectoryExists(networkPath);
+            
+            // 生成基於日期和發訊息人名稱的檔名
+            const ext = originalFilename.split('.').pop() || 'bin';
+            const safeSenderName = (messageData.from.name || messageData.from.number).replace(/[^a-zA-Z0-9_]/g, '_');
+            const timestamp = messageData.timestamp;
+            const newFilename = `${messageData.date}_${safeSenderName}_${timestamp}.${ext}`;
+            
+            // 目標檔案路徑
+            const targetPath = path.join(networkPath, newFilename);
+            
+            // 複製檔案
+            fs.writeFileSync(targetPath, buffer);
+            
+            console.log(`[${getTimestamp()}] 📤 已複製到網路位置: ${targetPath}`);
+            
+            // 自動回覆
+            if (msg) {
+                await msg.reply('(已Save PIC to Server)');
+                console.log(`[${getTimestamp()}] ✅ 已回覆: (已Save PIC to Server)`);
+            }
+            
+        } catch (error) {
+            console.error(`[${getTimestamp()}] ⚠️ 複製到網路位置失敗:`, error.message);
         }
     }
 

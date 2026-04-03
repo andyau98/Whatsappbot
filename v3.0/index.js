@@ -487,7 +487,7 @@ client.on('message_create', async (msg) => {
     // ============================================
     
     // 載入 SmartCommand 工具
-    const SmartCommand = require('./tools/smart-command');
+    const SmartCommand = require('../tools/smart-command/r1');
     const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
     
     // 解析用戶輸入

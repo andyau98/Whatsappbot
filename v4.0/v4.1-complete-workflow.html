@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot v4.1 - 完整命令清單與修復記錄</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 20px;
+            border: 1px solid #334155;
+        }
+        
+        h1 {
+            color: #38bdf8;
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.2em;
+        }
+        
+        .section {
+            background: rgba(30, 41, 59, 0.9);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .section-title {
+            font-size: 1.6em;
+            color: #38bdf8;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        /* 命令清單 */
+        .command-list {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .command-item {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .command-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .command-item.success { border-color: #22c55e; }
+        .command-item.warning { border-color: #f59e0b; }
+        .command-item.info { border-color: #3b82f6; }
+        .command-item.error { border-color: #ef4444; }
+        
+        .command-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .command-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #f1f5f9;
+        }
+        
+        .command-badges {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .badge-public { background: #166534; color: #86efac; }
+        .badge-slide { background: #92400e; color: #fcd34d; }
+        .badge-private { background: #1e40af; color: #93c5fd; }
+        .badge-smart { background: #701a75; color: #f0abfc; }
+        
+        .command-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 15px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+        
+        .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.85em;
+            flex-shrink: 0;
+        }
+        
+        .step-num.user { background: #3b82f6; color: white; }
+        .step-num.system { background: #6b7280; color: white; }
+        .step-num.bot { background: #22c55e; color: white; }
+        
+        .step-desc {
+            flex: 1;
+        }
+        
+        .step-code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #a5b4fc;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        /* 修復記錄 */
+        .fix-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .fix-item {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 10px;
+            padding: 18px;
+            border-left: 4px solid #22c55e;
+        }
+        
+        .fix-title {
+            font-weight: bold;
+            color: #86efac;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .fix-content {
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        
+        .fix-code {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #a5b4fc;
+            overflow-x: auto;
+        }
+        
+        /* 流程圖 */
+        .flowchart {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .flow-node {
+            padding: 18px 22px;
+            border-radius: 12px;
+            border: 2px solid;
+            position: relative;
+        }
+        
+        .flow-node.start {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: #22c55e;
+        }
+        
+        .flow-node.process {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: #3b82f6;
+        }
+        
+        .flow-node.decision {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: #f59e0b;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .flow-node.action {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: #a855f7;
+        }
+        
+        .flow-node.end {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+        }
+        
+        .node-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+        
+        .arrow-down {
+            text-align: center;
+            color: #64748b;
+            font-size: 2em;
+            padding: 10px 0;
+        }
+        
+        .branch-container {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        
+        .branch {
+            flex: 1;
+        }
+        
+        .branch-label {
+            text-align: center;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .branch-true {
+            background: rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+        
+        .branch-false {
+            background: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        
+        /* 表格 */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .info-table th,
+        .info-table td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .info-table th {
+            background: rgba(30, 41, 59, 0.9);
+            color: #38bdf8;
+            font-weight: bold;
+        }
+        
+        .info-table tr:hover {
+            background: rgba(51, 65, 85, 0.5);
+        }
+        
+        /* 響應式 */
+        @media (max-width: 768px) {
+            .branch-container {
+                flex-direction: column;
+            }
+            
+            .command-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="version-badge">v4.1</div>
+            <h1>🤖 WhatsApp Bot 完整命令清單</h1>
+            <p class="subtitle">所有修復已完成 | 100% 穩定版本</p>
+        </div>
+        
+        <!-- 版本更新說明 -->
+        <div class="section">
+            <div class="section-title">📦 v4.0 → v4.1 更新內容</div>
+            <div class="fix-list">
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 1: 群組授權邏輯（精確匹配）</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>isStartOrStop 使用 includes() 導致包含 "start" 的文字都被授權<br>
+                        <strong>修復：</strong>改為精確匹配 === 'start' 或 === 'stop'
+                    </div>
+                    <div class="fix-code">// 修改前
+const isStartOrStop = messageBody.toLowerCase().includes('start') || 
+                      messageBody.toLowerCase().includes('stop');
+
+// 修改後
+const isStartOrStop = messageBody.toLowerCase() === 'start' || 
+                      messageBody.toLowerCase() === 'stop';
+const isStatusOrMenu = messageBody === '狀態' || messageBody === '選單';</div>
+                </div>
+                
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 2: 重構智能指令處理</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>天氣查詢代碼冗長且重複<br>
+                        <strong>修復：</strong>提取 handleWeatherCommand() 函數，支持更多城市
+                    </div>
+                    <div class="fix-code">// 新增輔助函數
+async function handleWeatherCommand(messageBody, msg, chatId) {
+    const cityMap = {
+        '香港': 'Hong Kong',
+        '台北': 'Taipei',
+        '東京': 'Tokyo',
+        // ... 更多城市
+    };
+    // 統一處理天氣查詢邏輯
+}</div>
+                </div>
+                
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 3: 添加工具啟動狀態檢查</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>工具啟動失敗時無狀態提示<br>
+                        <strong>修復：</strong>添加 plugin.instance 驗證和詳細錯誤提示
+                    </div>
+                    <div class="fix-code">// 啟動工具時驗證狀態
+try {
+    const plugin = await pluginManager.activatePlugin(index, chatId);
+    if (plugin && plugin.instance) {
+        chatManager.addActivePlugin(chatId, toolName);
+        await msg.reply(`✅ 已啟動 ${toolName}`);
+    } else {
+        await msg.reply(`❌ 啟動 ${toolName} 失敗：工具實例創建失敗`);
+    }
+} catch (error) {
+    await msg.reply(`❌ 啟動 ${toolName} 失敗：${error.message}`);
+}</div>
+                </div>
+                
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 4: 完善錯誤處理機制</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>多個區塊無 try-catch，錯誤導致崩潰<br>
+                        <strong>修復：</strong>添加全面的錯誤捕獲和用戶提示
+                    </div>
+                    <div class="fix-code">// stop 指令添加錯誤處理
+try {
+    if (chatManager.hasActivePlugins(chatId)) {
+        const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+        stoppedPlugins.forEach(pluginName => {
+            try {
+                pluginManager.removePluginInstance(pluginName, chatId);
+            } catch (removeError) {
+                console.error(`清理失敗 ${pluginName}:`, removeError.message);
+            }
+        });
+    }
+} catch (error) {
+    await msg.reply(`❌ 停止工具失敗：${error.message}`);
+}</div>
+                </div>
+                
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 5: 優化訊息追蹤機制</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>發送失敗時無回滾機制<br>
+                        <strong>修復：</strong>每個訊息獨立 try-catch，記錄成功數量
+                    </div>
+                    <div class="fix-code">// sendToolMenu 優化
+const sentMessages = [];
+try {
+    for (let i = 0; i < pluginManager.plugins.length; i++) {
+        try {
+            const sentMessage = await msg.reply(toolMessage);
+            if (sentMessage && sentMessage.id) {
+                chatManager.trackMessage(sentMessage.id._serialized, ...);
+                sentMessages.push({ id: sentMessage.id._serialized, tool: plugin.name });
+            }
+        } catch (sendError) {
+            console.error(`發送工具 ${plugin.name} 訊息失敗:`, sendError.message);
+        }
+    }
+} catch (error) {
+    await msg.reply('❌ 發送選單失敗，請稍後重試');
+}</div>
+                </div>
+                
+                <div class="fix-item">
+                    <div class="fix-title">✅ 修復 6: 智能指令解析錯誤處理</div>
+                    <div class="fix-content">
+                        <strong>問題：</strong>智能指令解析區塊無 try-catch<br>
+                        <strong>修復：</strong>整個區塊添加錯誤捕獲，失敗不影響後續處理
+                    </div>
+                    <div class="fix-code">// 智能指令解析添加錯誤處理
+try {
+    const SmartCommand = require('./tools/smart-command');
+    const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
+    const parseResult = smartCommand.parse(messageBody);
+    
+    if (parseResult.matched) {
+        // 處理各種指令...
+    }
+} catch (smartError) {
+    console.error('智能指令解析失敗:', smartError.message);
+    // 繼續執行後續邏輯，不中斷
+}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 完整命令清單 -->
+        <div class="section">
+            <div class="section-title">📋 完整命令清單（v4.1）</div>
+            <div class="command-list">
+                
+                <!-- 命令 1: start -->
+                <div class="command-item success">
+                    <div class="command-header">
+                        <div class="command-name">🚀 start</div>
+                        <div class="command-badges">
+                            <span class="badge badge-public">公開</span>
+                            <span class="badge badge-private">私聊可用</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入 <span class="step-code">"start"</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">群組授權檢查 <span class="step-code">isStartOrStop === true</span> ✅ 通過</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">調用 <span class="step-code">sendToolMenu(msg, chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">4</div>
+                            <div class="step-desc">發送工具選單（多個獨立訊息）並追蹤訊息 ID</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">5</div>
+                            <div class="step-desc">回應：「🤖 機器人功能選單 v4.0」+ 工具列表 + 使用說明</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 2: stop -->
+                <div class="command-item success">
+                    <div class="command-header">
+                        <div class="command-name">🛑 stop</div>
+                        <div class="command-badges">
+                            <span class="badge badge-public">公開</span>
+                            <span class="badge badge-private">私聊可用</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入 <span class="step-code">"stop"</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">群組授權檢查 <span class="step-code">isStartOrStop === true</span> ✅ 通過</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">檢查活動工具 <span class="step-code">chatManager.hasActivePlugins(chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">4</div>
+                            <div class="step-desc">停止所有工具 <span class="step-code">chatManager.stopAllPlugins(chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">5</div>
+                            <div class="step-desc">清理工具實例 <span class="step-code">pluginManager.removePluginInstance()</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">6</div>
+                            <div class="step-desc">回應：「✅ 已停止工具：xxx, yyy」或「ℹ️ 當前聊天沒有運行中的工具」</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 3: 滑動工具訊息 -->
+                <div class="command-item warning">
+                    <div class="command-header">
+                        <div class="command-name">👆 滑動工具訊息</div>
+                        <div class="command-badges">
+                            <span class="badge badge-slide">需滑動</span>
+                            <span class="badge badge-private">群組限定</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶滑動回覆機器人的工具訊息</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">檢測滑動類型 <span class="step-code">testType = 1</span>（滑動機器人）✅</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">查找訊息對應工具 <span class="step-code">chatManager.getToolByMessageId(messageId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">4</div>
+                            <div class="step-desc">根據工具名稱執行對應操作</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">5</div>
+                            <div class="step-desc">回應：「✅ 已啟動 xxx」/「🏠 返回主頁」/「🛑 已停止所有功能」</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 4: 天氣查詢 -->
+                <div class="command-item info">
+                    <div class="command-header">
+                        <div class="command-name">🌤️ 天氣查詢</div>
+                        <div class="command-badges">
+                            <span class="badge badge-smart">智能</span>
+                            <span class="badge badge-public">無需滑動</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入「今天天氣如何」或「香港天氣」</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">智能指令優先處理（群組授權前）<span class="step-code">smartCommand.parse()</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">識別為 weather 指令 <span class="step-code">parseResult.command === 'weather'</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">4</div>
+                            <div class="step-desc">調用 <span class="step-code">handleWeatherCommand(messageBody, msg, chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">5</div>
+                            <div class="step-desc">提取城市名稱 → 調用 wttr.in API → 格式化結果</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">6</div>
+                            <div class="step-desc">回應：完整天氣資訊（溫度、濕度、風速、預報）</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 5: 狀態 -->
+                <div class="command-item success">
+                    <div class="command-header">
+                        <div class="command-name">📊 狀態</div>
+                        <div class="command-badges">
+                            <span class="badge badge-public">公開</span>
+                            <span class="badge badge-slide">群組需滑動</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入「狀態」</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">群組授權檢查 <span class="step-code">isStatusOrMenu === true</span> ✅ 通過</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">獲取活動工具列表 <span class="step-code">chatManager.getActivePlugins(chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">4</div>
+                            <div class="step-desc">回應：「📊 目前執行中功能：xxx, yyy」或「📊 目前無執行中功能」</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 6: 選單 -->
+                <div class="command-item success">
+                    <div class="command-header">
+                        <div class="command-name">📋 選單</div>
+                        <div class="command-badges">
+                            <span class="badge badge-public">公開</span>
+                            <span class="badge badge-slide">群組需滑動</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入「選單」</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">群組授權檢查 <span class="step-code">isStatusOrMenu === true</span> ✅ 通過</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">調用 <span class="step-code">sendToolMenu(msg, chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">4</div>
+                            <div class="step-desc">回應：重新發送工具選單</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 命令 7: 工具訊息處理 -->
+                <div class="command-item warning">
+                    <div class="command-header">
+                        <div class="command-name">🔧 工具訊息處理</div>
+                        <div class="command-badges">
+                            <span class="badge badge-slide">需啟動工具</span>
+                            <span class="badge badge-private">私聊/滑動</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶輸入工具指令（如「你好=你好！有什麼可以幫您？」）</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">檢查活動工具 <span class="step-code">chatManager.hasActivePlugins(chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">獲取工具實例 <span class="step-code">pluginManager.getPluginInstance(pluginName, chatId)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">4</div>
+                            <div class="step-desc">傳遞給工具處理 <span class="step-code">pluginData.instance.processMessage(msg)</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">5</div>
+                            <div class="step-desc">回應：根據工具邏輯回應（如「✅ 已儲存規則」）</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 錯誤場景 -->
+                <div class="command-item error">
+                    <div class="command-header">
+                        <div class="command-name">❌ 錯誤場景：指令被忽略</div>
+                        <div class="command-badges">
+                            <span class="badge badge-slide">未授權</span>
+                        </div>
+                    </div>
+                    <div class="command-flow">
+                        <div class="flow-step">
+                            <div class="step-num user">1</div>
+                            <div class="step-desc">用戶在群組中直接輸入「hi」（無滑動回覆）</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">2</div>
+                            <div class="step-desc">智能指令檢查 <span class="step-code">smartCommand.parse("hi")</span> → 不匹配</div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">3</div>
+                            <div class="step-desc">群組授權檢查 <span class="step-code">testType=0, isStartOrStop=false, isStatusOrMenu=false</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num system">4</div>
+                            <div class="step-desc">授權失敗 ❌ <span class="step-code">return（不處理）</span></div>
+                        </div>
+                        <div class="flow-step">
+                            <div class="step-num bot">5</div>
+                            <div class="step-desc">無回應（預期行為）</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 整體流程圖 -->
+        <div class="section">
+            <div class="section-title">🌊 整體處理流程圖</div>
+            <div class="flowchart">
+                <div class="flow-node start">
+                    <div class="node-title">🚀 開始：接收用戶訊息</div>
+                    <div style="color: #94a3b8;">client.on('message_create', async (msg) => { ... })</div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node process">
+                    <div class="node-title">🔍 處理：檢測訊息類型</div>
+                    <div style="color: #94a3b8;">檢查滑動回覆、聊天類型、訊息內容</div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node process">
+                    <div class="node-title">🧠 處理：智能指令優先</div>
+                    <div style="color: #94a3b8;">天氣查詢等指令無需授權，直接處理</div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node decision">
+                    <div class="node-title">🔒 決策：群組授權檢查</div>
+                </div>
+                
+                <div class="branch-container">
+                    <div class="branch">
+                        <div class="branch-label branch-false">❌ 拒絕</div>
+                        <div class="flow-node end">
+                            <div class="node-title">🚫 結束：忽略指令</div>
+                            <div style="color: #94a3b8;">無回應，記錄日誌</div>
+                        </div>
+                    </div>
+                    <div class="branch">
+                        <div class="branch-label branch-true">✅ 通過</div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node decision">
+                    <div class="node-title">👆 決策：滑動回覆處理</div>
+                </div>
+                
+                <div class="branch-container">
+                    <div class="branch">
+                        <div class="branch-label branch-true">是 → 啟動工具</div>
+                        <div class="flow-node action">
+                            <div class="node-title">⚡ 執行：啟動對應工具</div>
+                            <div style="color: #94a3b8;">主頁 / 停止 / 工具啟動</div>
+                        </div>
+                    </div>
+                    <div class="branch">
+                        <div class="branch-label branch-false">否 → 一般指令</div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node decision">
+                    <div class="node-title">💬 決策：一般指令處理</div>
+                </div>
+                
+                <div class="branch-container">
+                    <div class="branch">
+                        <div class="branch-label branch-true">是 → 處理指令</div>
+                        <div class="flow-node action">
+                            <div class="node-title">⚡ 執行：對應指令</div>
+                            <div style="color: #94a3b8;">start / stop / 狀態 / 選單</div>
+                        </div>
+                    </div>
+                    <div class="branch">
+                        <div class="branch-label branch-false">否 → 工具處理</div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <div class="flow-node decision">
+                    <div class="node-title">🔧 決策：工具訊息處理</div>
+                </div>
+                
+                <div class="branch-container">
+                    <div class="branch">
+                        <div class="branch-label branch-true">有活動工具</div>
+                        <div class="flow-node action">
+                            <div class="node-title">⚡ 執行：傳遞給工具</div>
+                            <div style="color: #94a3b8;">plugin.processMessage(msg)</div>
+                        </div>
+                    </div>
+                    <div class="branch">
+                        <div class="branch-label branch-false">無活動工具</div>
+                        <div class="flow-node end">
+                            <div class="node-title">🏁 結束：無處理</div>
+                            <div style="color: #94a3b8;">指令被忽略</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 錯誤處理機制 -->
+        <div class="section">
+            <div class="section-title">🛡️ v4.1 錯誤處理機制</div>
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>場景</th>
+                        <th>錯誤類型</th>
+                        <th>處理方式</th>
+                        <th>用戶提示</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>工具啟動</td>
+                        <td>實例創建失敗</td>
+                        <td>驗證 plugin.instance</td>
+                        <td>「❌ 啟動 xxx 失敗：工具實例創建失敗」</td>
+                    </tr>
+                    <tr>
+                        <td>工具啟動</td>
+                        <td>異常拋出</td>
+                        <td>try-catch 捕獲</td>
+                        <td>「❌ 啟動 xxx 失敗：{錯誤訊息}」</td>
+                    </tr>
+                    <tr>
+                        <td>停止工具</td>
+                        <td>清理實例失敗</td>
+                        <td>單個捕獲，不影響其他</td>
+                        <td>正常回應已停止的工具</td>
+                    </tr>
+                    <tr>
+                        <td>停止工具</td>
+                        <td>整體異常</td>
+                        <td>外層 try-catch</td>
+                        <td>「❌ 停止工具失敗：{錯誤訊息}」</td>
+                    </tr>
+                    <tr>
+                        <td>發送選單</td>
+                        <td>單個訊息失敗</td>
+                        <td>獨立 try-catch</td>
+                        <td>繼續發送其他訊息</td>
+                    </tr>
+                    <tr>
+                        <td>發送選單</td>
+                        <td>整體失敗</td>
+                        <td>外層 try-catch</td>
+                        <td>「❌ 發送選單失敗，請稍後重試」</td>
+                    </tr>
+                    <tr>
+                        <td>智能指令</td>
+                        <td>解析失敗</td>
+                        <td>try-catch 捕獲</td>
+                        <td>無提示，繼續後續處理</td>
+                    </tr>
+                    <tr>
+                        <td>工具處理</td>
+                        <td>processMessage 失敗</td>
+                        <td>try-catch 捕獲</td>
+                        <td>無提示，記錄日誌</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 狀態管理 -->
+        <div class="section">
+            <div class="section-title">📊 狀態管理結構</div>
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>狀態類型</th>
+                        <th>數據結構</th>
+                        <th>用途</th>
+                        <th>生命周期</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>聊天狀態</td>
+                        <td><code>chats: Map&lt;chatId, ChatState&gt;</code></td>
+                        <td>存儲每個聊天的工具狀態</td>
+                        <td>持久化（直到 stop）</td>
+                    </tr>
+                    <tr>
+                        <td>活動工具</td>
+                        <td><code>activePlugins: Set&lt;pluginName&gt;</code></td>
+                        <td>記錄當前運行的工具</td>
+                        <td>工具啟動 → 停止</td>
+                    </tr>
+                    <tr>
+                        <td>訊息追蹤</td>
+                        <td><code>messageTracker: Map&lt;messageId, ToolInfo&gt;</code></td>
+                        <td>關聯訊息與工具</td>
+                        <td>24 小時自動清理</td>
+                    </tr>
+                    <tr>
+                        <td>工具實例</td>
+                        <td><code>pluginInstances: Map&lt;key, Instance&gt;</code></td>
+                        <td>存儲每個聊天的工具實例</td>
+                        <td>工具啟動 → 停止</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 版本歷史 -->
+        <div class="section">
+            <div class="section-title">📜 版本歷史</div>
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>版本</th>
+                        <th>更新內容</th>
+                        <th>狀態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>v4.1</strong></td>
+                        <td>修復所有錯誤處理問題，優化群組授權邏輯，添加完整錯誤提示</td>
+                        <td style="color: #22c55e;">✅ 當前版本（穩定）</td>
+                    </tr>
+                    <tr>
+                        <td>v4.0</td>
+                        <td>分開訊息發送、滑動關聯、群組私聊區分、智能指令優先</td>
+                        <td style="color: #f59e0b;">⚠️ 已更新至 v4.1</td>
+                    </tr>
+                    <tr>
+                        <td>v3.0</td>
+                        <td>智能指令解析，支援自然語言操作</td>
+                        <td style="color: #64748b;">—</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -6,25 +6,41 @@
  * 2. 在一個聊天中啟動的工具，不影響其他聊天
  * 3. 支援多個聊天同時使用不同工具
  * 4. v3.0 新增：智能指令解析，支援自然語言操作
+ * 5. v4.0 新增：分開訊息發送、滑動關聯、群組私聊區分
  *
  * 【使用方式】
  * - 私聊：直接發送指令
- * - 群組：@機器人名稱 + 指令
- * - 輸入 "start" 開啟工具選單
- * - 輸入 "stop" 停止當前聊天的工具
+ * - 群組：滑動回覆機器人訊息 + 指令
+ * - 輸入 "start" 開啟工具選單（所有人可用）
+ * - 輸入 "stop" 停止當前聊天的工具（所有人可用）
  * - v3.0：直接用自然語言操作，如「幫我記住這個」
+ * - v4.0：分開訊息發送，滑動特定訊息執行對應功能
+ *
+ * 【群組指令授權規則】
+ * 1. start / stop 指令：所有人都可以使用
+ * 2. 其他指令：必須滑動回覆機器人訊息才能使用
+ * 3. 滑動回覆其他人訊息：指令被忽略
+ *
+ * 【v4.0 新功能】
+ * 1. 分開訊息發送：每個工具獨立訊息，方便滑動回覆
+ * 2. 滑動關聯：滑動特定工具訊息直接執行對應功能
+ * 3. 群組私聊區分：群組用滑動回覆，私聊直接輸入
+ * 4. 訊息追蹤系統：追蹤每個訊息對應的工具
  *
  * 【跨電腦相容】
  * - 使用動態路徑偵測
  * - 自動適應不同電腦的目錄結構
  *
- * @version 3.0
+ * @version 4.0
  */
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const path = require('path');
 const fs = require('fs');
+
+// 滑動回覆接口
+const slideReplyInterface = require('./tools/slide-reply-interface');
 
 // 獲取專案根目錄
 const PROJECT_ROOT = __dirname;
@@ -46,8 +62,12 @@ function getTimestamp() {
 class ChatManager {
     constructor() {
         // 存儲每個聊天的狀態
-        // key: chatId, value: { waitingForSelection, activePlugins: Set }
+        // key: chatId, value: { waitingForSelection, activePlugins: Set, messageMap: Map }
         this.chats = new Map();
+        
+        // v4.0: 訊息追蹤系統
+        // key: messageId, value: { toolName, chatId, timestamp }
+        this.messageTracker = new Map();
     }
 
     /**
@@ -117,6 +137,55 @@ class ChatManager {
     hasActivePlugins(chatId) {
         return this.getChatState(chatId).activePlugins.size > 0;
     }
+
+    // ============================================
+    // v4.0: 訊息追蹤系統
+    // ============================================
+
+    /**
+     * 追蹤發出的訊息
+     */
+    trackMessage(messageId, toolName, chatId) {
+        this.messageTracker.set(messageId, {
+            toolName: toolName,
+            chatId: chatId,
+            timestamp: new Date()
+        });
+        console.log(`[${getTimestamp()}] 📍 v4.0 追蹤訊息: ${messageId} -> ${toolName} [聊天: ${chatId}]`);
+    }
+
+    /**
+     * 根據訊息ID獲取對應的工具
+     */
+    getToolByMessageId(messageId) {
+        const tracking = this.messageTracker.get(messageId);
+        if (tracking) {
+            console.log(`[${getTimestamp()}] 🔍 v4.0 找到訊息對應工具: ${messageId} -> ${tracking.toolName}`);
+            return tracking.toolName;
+        }
+        console.log(`[${getTimestamp()}] ⚠️ v4.0 未找到訊息對應工具: ${messageId}`);
+        return null;
+    }
+
+    /**
+     * 清理過期的訊息追蹤（避免記憶體洩漏）
+     */
+    cleanupExpiredMessages(maxAgeHours = 24) {
+        const now = new Date();
+        const maxAge = maxAgeHours * 60 * 60 * 1000; // 轉換為毫秒
+        
+        let cleanedCount = 0;
+        for (const [messageId, tracking] of this.messageTracker.entries()) {
+            if (now - tracking.timestamp > maxAge) {
+                this.messageTracker.delete(messageId);
+                cleanedCount++;
+            }
+        }
+        
+        if (cleanedCount > 0) {
+            console.log(`[${getTimestamp()}] 🧹 v4.0 清理了 ${cleanedCount} 個過期訊息追蹤`);
+        }
+    }
 }
 
 // ============================================
@@ -185,11 +254,22 @@ class PluginManager {
             return '暫無可用工具';
         }
 
-        let list = '\n📋 可用工具列表：\n\n';
+        let list = '🤖 *機器人功能選單*\n\n';
+        list += '📖 *使用方法：*\n';
+        list += '• 私聊：直接輸入指令\n';
+        list += '• 群組：滑動回覆機器人訊息後輸入指令\n\n';
+        
+        list += '📋 *可用工具：*\n\n';
         this.plugins.forEach((plugin, index) => {
-            list += `${index + 1}. ${plugin.name}\n`;
+            list += `${index + 1}. *${plugin.name}*\n`;
             list += `   ${plugin.description}\n\n`;
         });
+        
+        list += '🌤️ *快速指令：*\n';
+        list += '• 「今天天氣如何」- 查詢天氣\n';
+        list += '• 「香港天氣」- 查詢指定城市天氣\n';
+        list += '• 「stop」- 停止所有功能\n\n';
+        
         list += '請回覆數字 (1-' + this.plugins.length + ') 選擇工具\n';
         list += '或回覆 "0" 取消';
 
@@ -304,16 +384,24 @@ client.on('ready', async () => {
     botId = info.wid._serialized;
     botNumber = info.wid.user;  // 提取手機號碼
 
+    // v4.0: 啟動定期的訊息追蹤清理
+    setInterval(() => {
+        chatManager.cleanupExpiredMessages(24); // 每24小時清理一次
+    }, 60 * 60 * 1000); // 每小時檢查一次
+
     printDivider();
     console.log(`[${getTimestamp()}] ✅ WhatsApp 已成功連接並準備就緒！`);
     console.log(`[${getTimestamp()}] 📍 專案根目錄: ${PROJECT_ROOT}`);
     console.log(`[${getTimestamp()}] 🤖 機器人正在運行中...`);
+    console.log(`[${getTimestamp()}] 💡 v4.0 新功能已啟用！`);
     console.log(`[${getTimestamp()}] 💡 私聊: 直接發送指令`);
-    console.log(`[${getTimestamp()}] 💡 群組: 必須 @機器人 或滑動回覆機器人訊息`);
-    console.log(`[${getTimestamp()}] 🚀 輸入 "start" 開啟工具選單`);
-    console.log(`[${getTimestamp()}] 🛑 輸入 "stop" 停止當前聊天的工具`);
+    console.log(`[${getTimestamp()}] 💡 群組: 滑動回覆機器人訊息後輸入指令`);
+    console.log(`[${getTimestamp()}] 🚀 輸入 "start" 開啟工具選單（所有人可用）`);
+    console.log(`[${getTimestamp()}] 🛑 輸入 "stop" 停止當前聊天的工具（所有人可用）`);
     console.log(`[${getTimestamp()}] 🧠 v3.0: 支援自然語言，如「幫我記住這個」`);
-    console.log(`[${getTimestamp()}] 🌤️ 天氣查詢: 「今天天氣如何」、「香港天氣」`);
+    console.log(`[${getTimestamp()}] 🌤️ v4.0: 分開訊息發送、滑動關聯、群組私聊區分`);
+    console.log(`[${getTimestamp()}] 📱 天氣查詢: 「今天天氣如何」、「香港天氣」`);
+    console.log(`[${getTimestamp()}] 🔄 v4.0 訊息追蹤系統已啟動`);
     printDivider();
 });
 
@@ -350,63 +438,54 @@ client.on('message_create', async (msg) => {
         printDivider();
     }
 
-    // 檢查群組 @提及（群組指令需要 @提及）
-    const hasMention = msg.mentionedIds && msg.mentionedIds.length > 0;
+    // 檢查滑動回覆（群組指令只接受滑動回覆機器人訊息）
+    let isReplyToBot = false;
+    let isReplyToOther = false;
+    if (msg.hasQuotedMsg) {
+        try {
+            const quoted = await msg.getQuotedMessage();
+            if (quoted.fromMe) {
+                isReplyToBot = true;
+            } else {
+                isReplyToOther = true;
+            }
+        } catch (error) {
+            console.error(`[${getTimestamp()}] ❌ 檢查滑動回覆失敗:`, error.message);
+        }
+    }
     
-    // 檢查是否@機械人自己（而不是@其他用戶）
-    // 注意：msg.mentionedIds 可能包含字串或物件，需要轉換為字串比較
-    const isMentioningBotById = hasMention && botId && msg.mentionedIds.some(id => {
-        const idStr = typeof id === 'string' ? id : (id._serialized || id.toString());
-        return idStr === botId;
-    });
+    // 確定測試類型
+    let testType = 0;
+    if (chat.isGroup) {
+        if (isReplyToBot) testType = 1; // 滑動回覆機器人
+        else if (isReplyToOther) testType = 2; // 滑動回覆其他人
+    }
     
-    // 檢查訊息內容是否包含機械人手機號碼（備用檢測方式）
-    const isMentioningBotByNumber = botNumber && messageBody.includes(botNumber);
-    
-    // 綜合判斷是否@機械人（只使用準確的 ID 比對，不使用 isSingleMention）
-    const isMentioningBot = isMentioningBotById || isMentioningBotByNumber;
-    
-    // 調試日誌：顯示 @提及資訊
-    if (chat.isGroup && hasMention) {
-        console.log(`[${getTimestamp()}] 🔍 群組 @提及檢測 [聊天: ${chatId}]`);
-        console.log(`   botId: ${botId}`);
-        console.log(`   botNumber: ${botNumber}`);
-        console.log(`   mentionedIds: ${JSON.stringify(msg.mentionedIds)}`);
-        console.log(`   isMentioningBotById: ${isMentioningBotById}`);
-        console.log(`   isMentioningBotByNumber: ${isMentioningBotByNumber}`);
-        console.log(`   isMentioningBot: ${isMentioningBot}`);
+    // 調試日誌：顯示滑動回覆資訊
+    if (chat.isGroup) {
+        console.log(`[${getTimestamp()}] 🔍 群組指令檢測 [類型: ${testType}] [聊天: ${chatId}]`);
+        console.log(`   類型說明: ${testType === 1 ? '1=滑動回覆機器人' : testType === 2 ? '2=滑動回覆其他人' : '0=無滑動回覆'}`);
+        console.log(`   isReplyToBot: ${isReplyToBot}`);
+        console.log(`   isReplyToOther: ${isReplyToOther}`);
     }
 
     // ============================================
-    // 【新增：@機械人時主動發出功能訊息】
+    // v4.0: 私聊直接指令處理
     // ============================================
-    if (chat.isGroup && isMentioningBot) {
-        console.log(`[${getTimestamp()}] 📢 機械人被 @提及 [聊天: ${chatId}]`);
+    if (!chat.isGroup) {
+        console.log(`[${getTimestamp()}] 💬 v4.0 私聊直接指令處理 [聊天: ${chatId}]`);
         
-        // 檢查是否是 @機械人 (Stop) 指令
-        if (messageBody.toLowerCase().includes('stop')) {
-            console.log(`[${getTimestamp()}] 🛑 @機械人 (Stop) 指令 [聊天: ${chatId}]`);
-            
-            // 停止所有功能
-            if (chatManager.hasActivePlugins(chatId)) {
-                const stoppedPlugins = chatManager.stopAllPlugins(chatId);
-                stoppedPlugins.forEach(pluginName => {
-                    pluginManager.removePluginInstance(pluginName, chatId);
-                });
-                await msg.reply('🛑 已停止所有功能');
-                console.log(`[${getTimestamp()}] ✅ 已停止所有功能 [聊天: ${chatId}]`);
-            } else {
-                await msg.reply('ℹ️ 目前無執行中功能');
+        // 檢查是否有活動的工具支援滑動回覆
+        const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
+        for (const pluginName of activePlugins) {
+            if (slideReplyInterface.hasSlideReplySupport(pluginName)) {
+                console.log(`[${getTimestamp()}] 🔄 v4.0 私聊直接處理: ${pluginName} [聊天: ${chatId}]`);
+                const processed = await slideReplyInterface.processSlideReply(msg, pluginName, messageBody);
+                if (processed) {
+                    return;
+                }
             }
-            return;
         }
-        
-        // 發送功能說明
-        const featureMenu = `🤖 機械人功能說明\n\n請滑動回覆這條訊息來下指令：\n1=自動回覆 2=記錄訊息 3=智能指令 0=停止所有\n\n各工具說明：\n1. 自動回覆 (auto-reply)：自動回覆收到的訊息\n2. 記錄訊息 (msg-extractor)：提取並儲存 WhatsApp 訊息到本地\n3. 智能指令 (smart-command)：支援自然語言操作\n\n也可以直接輸入：\n- start → 開啟工具選單\n- stop → 停止所有功能`;
-        
-        await msg.reply(featureMenu);
-        console.log(`[${getTimestamp()}] ✅ 已發送功能說明 [聊天: ${chatId}]`);
-        return;
     }
 
     // ============================================
@@ -419,7 +498,33 @@ client.on('message_create', async (msg) => {
             const quoted = await msg.getQuotedMessage();
             // 檢查是否是回覆機器人自己的訊息
             if (quoted.fromMe) {
-                console.log(`[${getTimestamp()}] 💬 收到滑動回覆指令 [聊天: ${chatId}]`);
+                console.log(`[${getTimestamp()}] 💬 v4.0 收到滑動回覆指令 [聊天: ${chatId}]`);
+                
+                // v4.0: 檢查滑動的是哪個工具的訊息
+                const quotedMessageId = quoted.id._serialized;
+                const toolName = chatManager.getToolByMessageId(quotedMessageId);
+                
+                if (toolName && slideReplyInterface.hasSlideReplySupport(toolName)) {
+                    console.log(`[${getTimestamp()}] 🔄 v4.0 滑動關聯: ${toolName} [聊天: ${chatId}]`);
+                    const processed = await slideReplyInterface.processSlideReply(msg, toolName, messageBody);
+                    if (processed) {
+                        isCommandProcessed = true;
+                        return;
+                    }
+                }
+                
+                // 檢查是否有活動的工具支援滑動回覆
+                const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
+                for (const pluginName of activePlugins) {
+                    if (slideReplyInterface.hasSlideReplySupport(pluginName)) {
+                        console.log(`[${getTimestamp()}] 🔄 使用滑動回覆接口處理: ${pluginName} [聊天: ${chatId}]`);
+                        const processed = await slideReplyInterface.processSlideReply(msg, pluginName, messageBody);
+                        if (processed) {
+                            isCommandProcessed = true;
+                            return;
+                        }
+                    }
+                }
                 
                 // 解析指令
                 const command = messageBody.trim().toLowerCase();
@@ -550,51 +655,113 @@ client.on('message_create', async (msg) => {
     }
 
     // ============================================
-    // 【群組指令權限檢查】
+    // 【群組指令授權檢查】
     // ============================================
-    // 在群組中，所有指令都需要 @機器人 或滑動回覆機器人的訊息
+    // 在群組中，只有以下情況才處理指令：
+    // 1. 滑動回覆機器人的訊息
+    // 2. start / stop 指令（所有人都可以使用）
+    const isStartOrStop = messageBody.toLowerCase() === 'start' || 
+                          messageBody.toLowerCase() === 'stop' ||
+                          messageBody.toLowerCase().includes('start') ||
+                          messageBody.toLowerCase().includes('stop');
+    
     if (chat.isGroup) {
-        // 檢查是否是滑動回覆機器人的訊息
-        let isReplyToBot = false;
-        if (msg.hasQuotedMsg) {
-            try {
-                const quoted = await msg.getQuotedMessage();
-                if (quoted.fromMe) {
-                    isReplyToBot = true;
-                }
-            } catch (error) {
-                console.error(`[${getTimestamp()}] ❌ 檢查滑動回覆失敗:`, error.message);
-            }
+        if (testType === 1 || isStartOrStop) {
+            console.log(`[${getTimestamp()}] ✅ 類型 ${testType}: 群組指令已授權 (滑動回覆機器人或 start/stop) [聊天: ${chatId}]`);
+        } else {
+            console.log(`[${getTimestamp()}] ❌ 類型 ${testType}: 群組訊息未滑動回覆機器人，忽略指令 [聊天: ${chatId}]`);
+            return; // 不處理這個訊息
         }
-        
-        // 如果不是 @機器人 也不是滑動回覆機器人的訊息，則忽略
-        if (!isMentioningBot && !isReplyToBot) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息未 @機器人，忽略指令 [聊天: ${chatId}]`);
-            return;
+    }
+
+    // ============================================
+    // 【測試指令處理】
+    // ============================================
+    // 處理測試指令: test1, test2
+    // test1: 滑動回覆機器人
+    // test2: 滑動回覆其他人
+    const testMatch = messageBody.match(/^test([12])$/i);
+    if (testMatch) {
+        const testNum = testMatch[1];
+        const testTypes = {
+            '1': '滑動回覆機器人',
+            '2': '滑動回覆其他人'
+        };
+
+        console.log(`[${getTimestamp()}] 🧪 收到測試指令 test${testNum} [類型: ${testTypes[testNum]}] [聊天: ${chatId}]`);
+        console.log(`[${getTimestamp()}] 🧪 當前檢測狀態: testType=${testType}, isReplyToBot=${isReplyToBot}`);
+
+        // 根據測試類型驗證
+        let isValid = false;
+        if (testNum === '1' && testType === 1) isValid = true;  // 滑動回覆機器人
+        else if (testNum === '2' && testType === 2) isValid = true;  // 滑動回覆其他人
+
+        if (isValid) {
+            const successMsg = `✅ *測試 ${testNum} 成功！*\n\n` +
+                `📋 類型: ${testTypes[testNum]}\n` +
+                `🔍 檢測結果: 正確 ✓\n\n` +
+                `---\n` +
+                `📝 下一步:\n` +
+                (testNum === '1' ? '請繼續測試 2: 滑動回覆其他人訊息 + test2' :
+                 '✨ 所有測試完成！系統正常運作。');
+            await msg.reply(successMsg);
+            console.log(`[${getTimestamp()}] ✅ 測試 ${testNum} 成功！類型檢測正確`);
+        } else {
+            const failMsg = `❌ *測試 ${testNum} 失敗！*\n\n` +
+                `📋 預期類型: ${testTypes[testNum]}\n` +
+                `🔍 實際類型: ${testType}\n\n` +
+                `💡 請檢查操作方式後重試。\n` +
+                (testNum === '1' ? '提示: 請滑動回覆機器人的訊息' :
+                 '提示: 請滑動回覆其他人的訊息');
+            await msg.reply(failMsg);
+            console.log(`[${getTimestamp()}] ❌ 測試 ${testNum} 失敗！預期類型=${testNum}, 實際類型=${testType}`);
         }
-        
-        console.log(`[${getTimestamp()}] ✅ 群組指令已授權 (@機器人或滑動回覆) [聊天: ${chatId}]`);
+        return;
     }
 
     // ============================================
     // 【指令處理區】
     // ============================================
 
-    // 處理 "start" 指令 - 顯示工具選單
-    // 群組中必須 @機械人才會回應
-    if (!chat.isGroup || isMentioningBot) {
-        if (messageBody.toLowerCase() === 'start' || messageBody.toLowerCase().includes('start')) {
-            console.log(`[${getTimestamp()}] 🚀 用戶請求工具選單 [聊天: ${chatId}]`);
+    // 處理 "start" 指令 - 顯示工具選單 (v4.0 分開訊息發送)
+    // 群組中必須滑動回覆機器人的訊息才會回應
+    if (messageBody.toLowerCase() === 'start' || messageBody.toLowerCase().includes('start')) {
+        console.log(`[${getTimestamp()}] 🚀 v4.0 用戶請求工具選單 [聊天: ${chatId}]`);
 
-            const pluginList = pluginManager.getPluginList();
-            await msg.reply(pluginList);
-
-            // 設置這個聊天的等待選擇狀態
-            chatManager.setWaitingForSelection(chatId, true);
-
-            console.log(`[${getTimestamp()}] ✅ 已發送工具列表 [聊天: ${chatId}]`);
-            return;
+        // v4.0: 分開發送多個訊息，每個工具一個訊息
+        const menuMessage = await msg.reply('🤖 *機器人功能選單 v4.0*\n\n📖 請選擇您要使用的功能：');
+        
+        // 發送每個工具的詳細介紹（分開訊息）並追蹤
+        for (let i = 0; i < pluginManager.plugins.length; i++) {
+            const plugin = pluginManager.plugins[i];
+            const toolMessage = `\n${i + 1}. *${plugin.name}*\n` +
+                              `   ${plugin.description}\n` +
+                              `   💡 滑動回覆此訊息即可使用`;
+            
+            const sentMessage = await msg.reply(toolMessage);
+            
+            // v4.0: 追蹤這個訊息對應的工具
+            if (sentMessage && sentMessage.id) {
+                chatManager.trackMessage(sentMessage.id._serialized, plugin.name, chatId);
+            }
         }
+        
+        // 發送操作指引（分開訊息）
+        const usageMessage = `\n🌤️ *快速指令*\n` +
+                           `• 天氣查詢：滑動回覆天氣工具訊息後輸入城市名稱\n` +
+                           `• 自動回覆：滑動回覆自動回覆工具訊息後輸入指令\n\n` +
+                           `💡 *v4.0 新功能*\n` +
+                           `• 分開訊息發送，每個工具獨立\n` +
+                           `• 滑動關聯：滑動特定訊息執行對應功能\n` +
+                           `• 群組/私聊區分：群組用滑動回覆，私聊直接輸入`;
+        
+        await msg.reply(usageMessage);
+
+        // 設置這個聊天的等待選擇狀態
+        chatManager.setWaitingForSelection(chatId, true);
+
+        console.log(`[${getTimestamp()}] ✅ v4.0 已發送分開的工具列表 [聊天: ${chatId}]`);
+        return;
     }
 
     // 處理工具選擇（每個聊天獨立）
@@ -650,28 +817,25 @@ client.on('message_create', async (msg) => {
     }
 
     // 處理 "stop" 指令 - 停止當前聊天的工具
-    // 群組中必須 @機械人才會回應
-    if (!chat.isGroup || isMentioningBot) {
-        if (messageBody.toLowerCase() === 'stop' || messageBody.toLowerCase().includes('stop')) {
-            console.log(`[${getTimestamp()}] 🛑 用戶請求停止工具 [聊天: ${chatId}]`);
+    if (messageBody.toLowerCase() === 'stop' || messageBody.toLowerCase().includes('stop')) {
+        console.log(`[${getTimestamp()}] 🛑 用戶請求停止工具 [聊天: ${chatId}]`);
 
-            // 停止這個聊天的所有活動工具
-            if (chatManager.hasActivePlugins(chatId)) {
-                const stoppedPlugins = chatManager.stopAllPlugins(chatId);
-                
-                // 清理工具實例
-                stoppedPlugins.forEach(pluginName => {
-                    pluginManager.removePluginInstance(pluginName, chatId);
-                });
-                
-                await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
-                console.log(`[${getTimestamp()}] ✅ 已停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
-            } else {
-                await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
-                console.log(`[${getTimestamp()}] ℹ️ 當前聊天沒有運行中的工具 [聊天: ${chatId}]`);
-            }
-            return;
+        // 停止這個聊天的所有活動工具
+        if (chatManager.hasActivePlugins(chatId)) {
+            const stoppedPlugins = chatManager.stopAllPlugins(chatId);
+            
+            // 清理工具實例
+            stoppedPlugins.forEach(pluginName => {
+                pluginManager.removePluginInstance(pluginName, chatId);
+            });
+            
+            await msg.reply(`✅ 已停止工具：${stoppedPlugins.join(', ')}`);
+            console.log(`[${getTimestamp()}] ✅ 已停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
+        } else {
+            await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
+            console.log(`[${getTimestamp()}] ℹ️ 當前聊天沒有運行中的工具 [聊天: ${chatId}]`);
         }
+        return;
     }
 
     // ============================================
@@ -699,15 +863,19 @@ client.on('message_create', async (msg) => {
     // 【v3.0 智能指令解析】
     // ============================================
     
-    // 載入 SmartCommand 工具
-    const SmartCommand = require('./tools/smart-command');
-    const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
-    
-    // 解析用戶輸入
-    const parseResult = smartCommand.parse(messageBody);
-    
-    if (parseResult.matched) {
-        console.log(`[${getTimestamp()}] 🧠 智能指令識別: ${parseResult.command} [聊天: ${chatId}]`);
+    // 如果處於工具選擇狀態，跳過智能指令解析
+    if (chatManager.isWaitingForSelection(chatId)) {
+        console.log(`[${getTimestamp()}] ℹ️ 處於工具選擇狀態，跳過智能指令解析 [聊天: ${chatId}]`);
+    } else {
+        // 載入 SmartCommand 工具
+        const SmartCommand = require('./tools/smart-command');
+        const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
+        
+        // 解析用戶輸入
+        const parseResult = smartCommand.parse(messageBody);
+        
+        if (parseResult.matched) {
+            console.log(`[${getTimestamp()}] 🧠 智能指令識別: ${parseResult.command} [聊天: ${chatId}]`);
         
         // 根據識別的指令執行對應操作
         switch (parseResult.command) {
@@ -822,6 +990,7 @@ client.on('message_create', async (msg) => {
                 }
                 return;
         }
+    }
     }
 
     // ============================================

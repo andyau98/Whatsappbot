@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot v4.0 - 自我輸入測試與邏輯結構</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #38bdf8;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .section {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid #334155;
+        }
+        
+        .section-title {
+            font-size: 1.4em;
+            color: #38bdf8;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* 測試場景卡片 */
+        .test-scenario {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        
+        .test-scenario.success {
+            border-color: #22c55e;
+        }
+        
+        .test-scenario.warning {
+            border-color: #f59e0b;
+        }
+        
+        .test-scenario.error {
+            border-color: #ef4444;
+        }
+        
+        .test-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .test-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 12px 15px;
+            background: #1e293b;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        
+        .step-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em;
+            flex-shrink: 0;
+        }
+        
+        .step-icon.user {
+            background: #3b82f6;
+        }
+        
+        .step-icon.bot {
+            background: #22c55e;
+        }
+        
+        .step-icon.system {
+            background: #6b7280;
+        }
+        
+        .step-icon.decision {
+            background: #f59e0b;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-action {
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-bottom: 5px;
+        }
+        
+        .step-detail {
+            font-size: 0.9em;
+            color: #94a3b8;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .step-result {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        
+        .result-success {
+            background: #166534;
+            color: #86efac;
+        }
+        
+        .result-error {
+            background: #991b1b;
+            color: #fca5a5;
+        }
+        
+        .result-warning {
+            background: #92400e;
+            color: #fcd34d;
+        }
+        
+        /* 整體邏輯結構 */
+        .logic-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .logic-node {
+            padding: 15px 20px;
+            border-radius: 10px;
+            border: 2px solid;
+            position: relative;
+        }
+        
+        .logic-node.start {
+            background: #14532d;
+            border-color: #22c55e;
+        }
+        
+        .logic-node.process {
+            background: #1e3a8a;
+            border-color: #3b82f6;
+        }
+        
+        .logic-node.decision {
+            background: #713f12;
+            border-color: #f59e0b;
+        }
+        
+        .logic-node.action {
+            background: #581c87;
+            border-color: #a855f7;
+        }
+        
+        .logic-node.end {
+            background: #7f1d1d;
+            border-color: #ef4444;
+        }
+        
+        .node-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+        
+        .node-code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            overflow-x: auto;
+            color: #a5b4fc;
+        }
+        
+        .branch-container {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+        
+        .branch-container::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: -15px;
+            bottom: 50%;
+            width: 2px;
+            background: #475569;
+        }
+        
+        .branch {
+            flex: 1;
+        }
+        
+        .branch-label {
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        
+        .branch-true {
+            background: #166534;
+            color: #86efac;
+        }
+        
+        .branch-false {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+        
+        /* 表格 */
+        .logic-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .logic-table th,
+        .logic-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .logic-table th {
+            background: #1e293b;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+        
+        .logic-table tr:hover {
+            background: #334155;
+        }
+        
+        /* 狀態指示器 */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .status-active {
+            background: #166534;
+            color: #86efac;
+        }
+        
+        .status-inactive {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+        
+        .status-pending {
+            background: #713f12;
+            color: #fcd34d;
+        }
+        
+        /* 箭頭 */
+        .arrow-down {
+            text-align: center;
+            color: #64748b;
+            font-size: 1.5em;
+            padding: 10px 0;
+        }
+        
+        /* 響應式 */
+        @media (max-width: 768px) {
+            .branch-container {
+                flex-direction: column;
+                padding-left: 15px;
+            }
+            
+            .branch-container::before {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 WhatsApp Bot v4.0</h1>
+        <p class="subtitle">自我輸入測試場景與整體邏輯結構</p>
+        
+        <!-- 測試場景 1: 正常流程 -->
+        <div class="section">
+            <div class="section-title">✅ 測試場景 1: 正常啟動流程</div>
+            
+            <div class="test-scenario success">
+                <div class="test-title">📱 群組中使用 start → 滑動工具 → 輸入指令</div>
+                <div class="test-flow">
+                    <div class="flow-step">
+                        <div class="step-icon user">👤</div>
+                        <div class="step-content">
+                            <div class="step-action">用戶輸入: "start"</div>
+                            <div class="step-detail">群組中直接輸入（無需滑動）</div>
+                            <span class="step-result result-success">✓ 授權通過（start 指令）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon bot">🤖</div>
+                        <div class="step-content">
+                            <div class="step-action">機器人發送工具選單</div>
+                            <div class="step-detail">發送多個獨立訊息，追蹤每個訊息 ID</div>
+                            <span class="step-result result-success">✓ 成功發送 5 個工具訊息</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon user">👤</div>
+                        <div class="step-content">
+                            <div class="step-action">用戶滑動 "auto-reply" 訊息</div>
+                            <div class="step-detail">滑動回覆機器人的工具訊息</div>
+                            <span class="step-result result-success">✓ testType=1（滑動機器人）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon system">⚙️</div>
+                        <div class="step-content">
+                            <div class="step-action">查找訊息對應工具</div>
+                            <div class="step-detail">messageTracker.get() → "auto-reply"</div>
+                            <span class="step-result result-success">✓ 找到對應工具</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon system">⚙️</div>
+                        <div class="step-content">
+                            <div class="step-action">啟動工具</div>
+                            <div class="step-detail">activatePlugin() → 創建實例 → addActivePlugin()</div>
+                            <span class="step-result result-success">✓ 工具啟動成功</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon bot">🤖</div>
+                        <div class="step-content">
+                            <div class="step-action">回應: "✅ 已啟動 auto-reply"</div>
+                            <div class="step-detail">工具狀態: activePlugins.add("auto-reply")</div>
+                            <span class="step-result result-success">✓ 用戶收到確認</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon user">👤</div>
+                        <div class="step-content">
+                            <div class="step-action">用戶輸入: "你好=你好！有什麼可以幫您？"</div>
+                            <div class="step-detail">滑動回覆或直接輸入（工具已啟動）</div>
+                            <span class="step-result result-success">✓ 傳遞給 auto-reply 處理</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon bot">🤖</div>
+                        <div class="step-content">
+                            <div class="step-action">回應: "✅ 已儲存規則"</div>
+                            <div class="step-detail">auto-reply.processMessage() 處理完成</div>
+                            <span class="step-result result-success">✓ 流程完成</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 測試場景 2: 錯誤流程 -->
+        <div class="section">
+            <div class="section-title">❌ 測試場景 2: 錯誤流程（指令被忽略）</div>
+            
+            <div class="test-scenario error">
+                <div class="test-title">📱 群組中直接輸入 "hi"（未啟動工具）</div>
+                <div class="test-flow">
+                    <div class="flow-step">
+                        <div class="step-icon user">👤</div>
+                        <div class="step-content">
+                            <div class="step-action">用戶輸入: "hi"</div>
+                            <div class="step-detail">群組中直接輸入，無滑動回覆</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon decision">🔍</div>
+                        <div class="step-content">
+                            <div class="step-action">智能指令解析</div>
+                            <div class="step-detail">smartCommand.parse("hi") → 不匹配任何指令</div>
+                            <span class="step-result result-warning">⚠ 無匹配指令</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon decision">🔒</div>
+                        <div class="step-content">
+                            <div class="step-action">群組授權檢查</div>
+                            <div class="step-detail">testType=0, isStartOrStop=false, isStatusOrMenu=false</div>
+                            <span class="step-result result-error">✗ 授權失敗</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon system">🚫</div>
+                        <div class="step-content">
+                            <div class="step-action">忽略指令</div>
+                            <div class="step-detail">console.log("群組訊息未滑動回覆機器人，忽略指令")</div>
+                            <span class="step-result result-error">✗ return（不處理）</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon bot">🤖</div>
+                        <div class="step-content">
+                            <div class="step-action">無回應</div>
+                            <div class="step-detail">機器人無任何回覆（預期行為）</div>
+                            <span class="step-result result-warning">⚠ 用戶無反饋</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 測試場景 3: 天氣查詢 -->
+        <div class="section">
+            <div class="section-title">🌤️ 測試場景 3: 天氣查詢（無需滑動）</div>
+            
+            <div class="test-scenario success">
+                <div class="test-title">📱 群組中直接輸入「今天天氣如何」</div>
+                <div class="test-flow">
+                    <div class="flow-step">
+                        <div class="step-icon user">👤</div>
+                        <div class="step-content">
+                            <div class="step-action">用戶輸入: "今天天氣如何"</div>
+                            <div class="step-detail">群組中直接輸入，無滑動回覆</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon decision">🧠</div>
+                        <div class="step-content">
+                            <div class="step-action">智能指令優先處理（群組授權前）</div>
+                            <div class="step-detail">smartCommand.parse() → matched=true, command="weather"</div>
+                            <span class="step-result result-success">✓ 識別為天氣查詢</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon system">⚙️</div>
+                        <div class="step-content">
+                            <div class="step-action">調用 handleWeatherCommand()</div>
+                            <div class="step-detail">提取城市 → 調用 API → 格式化結果</div>
+                            <span class="step-result result-success">✓ 處理完成</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="step-icon bot">🤖</div>
+                        <div class="step-content">
+                            <div class="step-action">回應天氣資訊</div>
+                            <div class="step-detail">顯示溫度、濕度、風速、預報等</div>
+                            <span class="step-result result-success">✓ 用戶收到天氣資訊</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 整體邏輯結構 -->
+        <div class="section">
+            <div class="section-title">🌳 整體邏輯結構（決策樹）</div>
+            
+            <div class="logic-tree">
+                <!-- 開始 -->
+                <div class="logic-node start">
+                    <div class="node-title">🚀 開始: 接收用戶訊息</div>
+                    <div>觸發點: client.on('message_create')</div>
+                    <div class="node-code">const messageBody = msg.body.trim();</div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 檢測 -->
+                <div class="logic-node process">
+                    <div class="node-title">🔍 處理: 檢測訊息類型</div>
+                    <div>檢查滑動回覆、聊天類型</div>
+                    <div class="node-code">testType = isReplyToBot ? 1 : isReplyToOther ? 2 : 0</div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 智能指令優先 -->
+                <div class="logic-node decision">
+                    <div class="node-title">🧠 決策: 是否為智能指令？</div>
+                    <div>天氣查詢等指令優先處理（無需授權）</div>
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="branch-label branch-true">是 → 直接處理</div>
+                            <div class="logic-node action">
+                                <div class="node-title">⚡ 執行: handleWeatherCommand()</div>
+                                <div>處理天氣查詢，發送回應</div>
+                                <div class="node-code">await handleWeatherCommand(body, msg, chatId); return;</div>
+                            </div>
+                        </div>
+                        <div class="branch">
+                            <div class="branch-label branch-false">否 → 繼續</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 群組授權 -->
+                <div class="logic-node decision">
+                    <div class="node-title">🔒 決策: 群組授權檢查</div>
+                    <div>檢查是否允許處理此指令</div>
+                    <div class="node-code">if (chat.isGroup && testType !== 1 && !isStartOrStop && !isStatusOrMenu) return;</div>
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="branch-label branch-false">否 → 拒絕</div>
+                            <div class="logic-node end">
+                                <div class="node-title">🚫 結束: 忽略指令</div>
+                                <div>無回應，記錄日誌</div>
+                                <div class="node-code">console.log("群組訊息未滑動回覆機器人，忽略指令"); return;</div>
+                            </div>
+                        </div>
+                        <div class="branch">
+                            <div class="branch-label branch-true">是 → 繼續</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 滑動回覆處理 -->
+                <div class="logic-node decision">
+                    <div class="node-title">👆 決策: 是否滑動回覆機器人訊息？</div>
+                    <div>檢查滑動的是哪個工具訊息</div>
+                    <div class="node-code">const toolName = chatManager.getToolByMessageId(quotedMessageId);</div>
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="branch-label branch-true">是 → 啟動工具</div>
+                            <div class="logic-node action">
+                                <div class="node-title">⚡ 執行: 啟動對應工具</div>
+                                <div>主頁/停止/工具啟動</div>
+                                <div class="node-code">pluginManager.activatePlugin(index, chatId);<br>chatManager.addActivePlugin(chatId, toolName);</div>
+                            </div>
+                        </div>
+                        <div class="branch">
+                            <div class="branch-label branch-false">否 → 一般指令</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 一般指令 -->
+                <div class="logic-node decision">
+                    <div class="node-title">💬 決策: 是否為一般指令？</div>
+                    <div>start, stop, 狀態, 選單等</div>
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="branch-label branch-true">是 → 處理指令</div>
+                            <div class="logic-node action">
+                                <div class="node-title">⚡ 執行: 對應指令</div>
+                                <div>發送選單/停止工具/顯示狀態</div>
+                                <div class="node-code">switch(command) { case 'start': sendToolMenu(); ... }</div>
+                            </div>
+                        </div>
+                        <div class="branch">
+                            <div class="branch-label branch-false">否 → 工具處理</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow-down">⬇️</div>
+                
+                <!-- 工具處理 -->
+                <div class="logic-node decision">
+                    <div class="node-title">🔧 決策: 是否有活動工具？</div>
+                    <div>檢查是否有工具正在運行</div>
+                    <div class="node-code">if (chatManager.hasActivePlugins(chatId)) { ... }</div>
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="branch-label branch-true">是 → 傳遞給工具</div>
+                            <div class="logic-node action">
+                                <div class="node-title">⚡ 執行: 工具處理訊息</div>
+                                <div>將訊息傳遞給活動工具</div>
+                                <div class="node-code">pluginData.instance.processMessage(msg);</div>
+                            </div>
+                        </div>
+                        <div class="branch">
+                            <div class="branch-label branch-false">否 → 結束</div>
+                            <div class="logic-node end">
+                                <div class="node-title">🏁 結束: 無處理</div>
+                                <div>無活動工具，指令被忽略</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 狀態管理 -->
+        <div class="section">
+            <div class="section-title">📊 狀態管理結構</div>
+            
+            <table class="logic-table">
+                <thead>
+                    <tr>
+                        <th>狀態類型</th>
+                        <th>數據結構</th>
+                        <th>用途</th>
+                        <th>生命周期</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>聊天狀態</strong></td>
+                        <td><code>chats: Map&lt;chatId, ChatState&gt;</code></td>
+                        <td>存儲每個聊天的工具狀態</td>
+                        <td>持久化（直到 stop）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>活動工具</strong></td>
+                        <td><code>activePlugins: Set&lt;pluginName&gt;</code></td>
+                        <td>記錄當前運行的工具</td>
+                        <td>工具啟動 → 停止</td>
+                    </tr>
+                    <tr>
+                        <td><strong>訊息追蹤</strong></td>
+                        <td><code>messageTracker: Map&lt;messageId, ToolInfo&gt;</code></td>
+                        <td>關聯訊息與工具</td>
+                        <td>24 小時自動清理</td>
+                    </tr>
+                    <tr>
+                        <td><strong>工具實例</strong></td>
+                        <td><code>pluginInstances: Map&lt;key, Instance&gt;</code></td>
+                        <td>存儲每個聊天的工具實例</td>
+                        <td>工具啟動 → 停止</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 關鍵代碼片段 -->
+        <div class="section">
+            <div class="section-title">📝 關鍵代碼片段</div>
+            
+            <div class="logic-node process" style="margin-bottom: 15px;">
+                <div class="node-title">1. 群組授權檢查</div>
+                <div class="node-code">const isStartOrStop = messageBody.toLowerCase() === 'start' || 
+                          messageBody.toLowerCase() === 'stop';
+const isStatusOrMenu = messageBody === '狀態' || messageBody === '選單';
+
+if (chat.isGroup) {
+    if (testType === 1 || isStartOrStop || isStatusOrMenu) {
+        // 授權通過
+    } else {
+        return; // 忽略指令
+    }
+}</div>
+            </div>
+            
+            <div class="logic-node process" style="margin-bottom: 15px;">
+                <div class="node-title">2. 滑動回覆處理</div>
+                <div class="node-code">if (msg.hasQuotedMsg && quoted.fromMe) {
+    const toolName = chatManager.getToolByMessageId(quoted.id._serialized);
+    
+    if (toolName === '主頁') {
+        await sendToolMenu(msg, chatId);
+    } else if (toolName === '停止') {
+        chatManager.stopAllPlugins(chatId);
+    } else {
+        // 啟動工具
+        const plugin = await pluginManager.activatePlugin(index, chatId);
+        if (plugin && plugin.instance) {
+            chatManager.addActivePlugin(chatId, toolName);
+        }
+    }
+}</div>
+            </div>
+            
+            <div class="logic-node process" style="margin-bottom: 15px;">
+                <div class="node-title">3. 工具訊息處理</div>
+                <div class="node-code">if (chatManager.hasActivePlugins(chatId)) {
+    const activePlugins = chatManager.getActivePlugins(chatId);
+    
+    for (const pluginName of activePlugins) {
+        const pluginData = pluginManager.getPluginInstance(pluginName, chatId);
+        
+        if (pluginData && pluginData.instance.processMessage) {
+            await pluginData.instance.processMessage(msg);
+        }
+    }
+}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
