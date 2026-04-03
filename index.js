@@ -363,12 +363,8 @@ client.on('message_create', async (msg) => {
     // 檢查訊息內容是否包含機械人手機號碼（備用檢測方式）
     const isMentioningBotByNumber = botNumber && messageBody.includes(botNumber);
     
-    // 檢查是否只有一個@提及（簡化判斷：如果只有一個@提及，且訊息包含指令，則視為@機械人）
-    // 這是因為 WhatsApp Web.js 的 ID 格式可能與實際顯示的不同
-    const isSingleMention = hasMention && msg.mentionedIds.length === 1;
-    
-    // 綜合判斷是否@機械人
-    const isMentioningBot = isMentioningBotById || isMentioningBotByNumber || isSingleMention;
+    // 綜合判斷是否@機械人（只使用準確的 ID 比對，不使用 isSingleMention）
+    const isMentioningBot = isMentioningBotById || isMentioningBotByNumber;
     
     // 調試日誌：顯示 @提及資訊
     if (chat.isGroup && hasMention) {
@@ -378,7 +374,6 @@ client.on('message_create', async (msg) => {
         console.log(`   mentionedIds: ${JSON.stringify(msg.mentionedIds)}`);
         console.log(`   isMentioningBotById: ${isMentioningBotById}`);
         console.log(`   isMentioningBotByNumber: ${isMentioningBotByNumber}`);
-        console.log(`   isSingleMention: ${isSingleMention}`);
         console.log(`   isMentioningBot: ${isMentioningBot}`);
     }
 
