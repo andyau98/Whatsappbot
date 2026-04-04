@@ -5,14 +5,12 @@
  * 1. 每個聊天（私聊/群組）獨立管理工具狀態
  * 2. 在一個聊天中啟動的工具，不影響其他聊天
  * 3. 支援多個聊天同時使用不同工具
- * 4. v3.0 新增：智能指令解析，支援自然語言操作
  *
  * 【使用方式】
  * - 私聊：直接發送指令
  * - 群組：@機器人名稱 + 指令
  * - 輸入 "start" 開啟工具選單
  * - 輸入 "stop" 停止當前聊天的工具
- * - v3.0：直接用自然語言操作，如「幫我記住這個」
  *
  * 【跨電腦相容】
  * - 使用動態路徑偵測
@@ -479,98 +477,6 @@ client.on('message_create', async (msg) => {
                     console.error(`[${getTimestamp()}] ❌ 工具 ${pluginName} 處理訊息失敗 [聊天: ${chatId}]:`, error.message);
                 }
             }
-        }
-    }
-
-    // ============================================
-    // 【v3.0 智能指令解析】
-    // ============================================
-    
-    // 載入 SmartCommand 工具
-    const SmartCommand = require('../tools/smart-command/r1');
-    const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
-    
-    // 解析用戶輸入
-    const parseResult = smartCommand.parse(messageBody);
-    
-    if (parseResult.matched) {
-        // 群組中需要 @提及
-        if (chat.isGroup && !hasMention) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組訊息但未 @提及，只顯示不回覆`);
-            return;
-        }
-        
-        console.log(`[${getTimestamp()}] 🧠 智能指令識別: ${parseResult.command} [聊天: ${chatId}]`);
-        
-        // 根據識別的指令執行對應操作
-        switch (parseResult.command) {
-            case 'msg-extractor':
-                // 檢查是否已經啟動
-                if (chatManager.getActivePlugins(chatId).has('msg-extractor')) {
-                    await msg.reply('ℹ️ msg-extractor 已經在運行中');
-                    return;
-                }
-                
-                // 找到 msg-extractor 的索引
-                const msgExtractorIndex = pluginManager.plugins.findIndex(p => p.name === 'msg-extractor');
-                if (msgExtractorIndex !== -1) {
-                    const plugin = await pluginManager.activatePlugin(msgExtractorIndex, chatId);
-                    if (plugin) {
-                        chatManager.addActivePlugin(chatId, 'msg-extractor');
-                        await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n工具：msg-extractor 已啟動`);
-                        console.log(`[${getTimestamp()}] ✅ 智能啟動 msg-extractor [聊天: ${chatId}]`);
-                    }
-                }
-                return;
-                
-            case 'auto-reply':
-                // 檢查是否已經啟動
-                if (chatManager.getActivePlugins(chatId).has('auto-reply')) {
-                    await msg.reply('ℹ️ auto-reply 已經在運行中');
-                    return;
-                }
-                
-                // 找到 auto-reply 的索引
-                const autoReplyIndex = pluginManager.plugins.findIndex(p => p.name === 'auto-reply');
-                if (autoReplyIndex !== -1) {
-                    const plugin = await pluginManager.activatePlugin(autoReplyIndex, chatId);
-                    if (plugin) {
-                        chatManager.addActivePlugin(chatId, 'auto-reply');
-                        await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n工具：auto-reply 已啟動`);
-                        console.log(`[${getTimestamp()}] ✅ 智能啟動 auto-reply [聊天: ${chatId}]`);
-                    }
-                }
-                return;
-                
-            case 'stop':
-                if (chatManager.hasActivePlugins(chatId)) {
-                    const stoppedPlugins = chatManager.stopAllPlugins(chatId);
-                    stoppedPlugins.forEach(pluginName => {
-                        pluginManager.removePluginInstance(pluginName, chatId);
-                    });
-                    await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n已停止：${stoppedPlugins.join(', ')}`);
-                    console.log(`[${getTimestamp()}] ✅ 智能停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
-                } else {
-                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
-                }
-                return;
-                
-            case 'start':
-                const pluginList = pluginManager.getPluginList();
-                await msg.reply(smartCommand.getResponse(parseResult) + '\n' + pluginList);
-                chatManager.setWaitingForSelection(chatId, true);
-                console.log(`[${getTimestamp()}] ✅ 智能顯示選單 [聊天: ${chatId}]`);
-                return;
-                
-            case 'status':
-                const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
-                if (activePlugins.length > 0) {
-                    await msg.reply(`📊 當前運行中的工具：\n${activePlugins.map(p => `• ${p}`).join('\n')}`);
-                } else {
-                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具\n\n輸入「顯示選單」查看可用功能');
-                }
-                console.log(`[${getTimestamp()}] ✅ 智能顯示狀態 [聊天: ${chatId}]`);
-                return;
         }
     }
 

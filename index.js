@@ -5,15 +5,13 @@
  * 1. 每個聊天（私聊/群組）獨立管理工具狀態
  * 2. 在一個聊天中啟動的工具，不影響其他聊天
  * 3. 支援多個聊天同時使用不同工具
- * 4. v3.0 新增：智能指令解析，支援自然語言操作
- * 5. v4.0 新增：分開訊息發送、滑動關聯、群組私聊區分
+ * 4. v4.0 新增：分開訊息發送、滑動關聯、群組私聊區分
  *
  * 【使用方式】
  * - 私聊：直接發送指令
  * - 群組：滑動回覆機器人訊息 + 指令
  * - 輸入 "start" 開啟工具選單（所有人可用）
  * - 輸入 "stop" 停止當前聊天的工具（所有人可用）
- * - v3.0：直接用自然語言操作，如「幫我記住這個」
  * - v4.0：分開訊息發送，滑動特定訊息執行對應功能
  *
  * 【群組指令授權規則】
@@ -577,27 +575,7 @@ client.on('message_create', async (msg) => {
                         isCommandProcessed = true;
                         return;
                         
-                    case '3':
-                    case '智能指令':
-                        // 啟動智能指令功能
-                        // 根據工具列表順序，smart-command 是第 3 個工具（索引 2）
-                        const smartCommandIndex = 2; // 直接使用索引位置
-                        if (smartCommandIndex >= 0 && smartCommandIndex < pluginManager.plugins.length) {
-                            const plugin = await pluginManager.activatePlugin(smartCommandIndex, chatId);
-                            if (plugin) {
-                                chatManager.addActivePlugin(chatId, 'smart-command');
-                                await msg.reply('✅ 已啟動智能指令\n\n功能：支援自然語言操作');
-                                console.log(`[${getTimestamp()}] ✅ 已啟動智能指令功能 [聊天: ${chatId}]`);
-                            } else {
-                                await msg.reply('❌ 啟動智能指令功能失敗');
-                            }
-                        } else {
-                            await msg.reply('❌ 智能指令功能不存在');
-                        }
-                        // 重置等待選擇狀態，避免觸發工具選擇處理
-                        chatManager.setWaitingForSelection(chatId, false);
-                        isCommandProcessed = true;
-                        return;
+
                         
                     case '0':
                     case '取消':
@@ -635,7 +613,7 @@ client.on('message_create', async (msg) => {
                         
                     case '選單':
                         // 重新顯示功能說明
-                        const featureMenu = `🤖 機械人功能說明\n\n請滑動回覆這條訊息來下指令：\n1=自動回覆 2=記錄訊息 3=智能指令 0=停止所有\n\n各工具說明：\n1. 自動回覆 (auto-reply)：自動回覆收到的訊息\n2. 記錄訊息 (msg-extractor)：提取並儲存 WhatsApp 訊息到本地\n3. 智能指令 (smart-command)：支援自然語言操作\n\n也可以直接輸入：\n- start → 開啟工具選單\n- stop → 停止所有功能`;
+                        const featureMenu = `🤖 機械人功能說明\n\n請滑動回覆這條訊息來下指令：\n1=自動回覆 2=記錄訊息 0=停止所有\n\n各工具說明：\n1. 自動回覆 (auto-reply)：自動回覆收到的訊息\n2. 記錄訊息 (msg-extractor)：提取並儲存 WhatsApp 訊息到本地\n\n也可以直接輸入：\n- start → 開啟工具選單\n- stop → 停止所有功能`;
                         await msg.reply(featureMenu);
                         console.log(`[${getTimestamp()}] ✅ 已重新顯示功能說明 [聊天: ${chatId}]`);
                         // 重置等待選擇狀態，避免觸發工具選擇處理
@@ -857,140 +835,6 @@ client.on('message_create', async (msg) => {
                 }
             }
         }
-    }
-
-    // ============================================
-    // 【v3.0 智能指令解析】
-    // ============================================
-    
-    // 如果處於工具選擇狀態，跳過智能指令解析
-    if (chatManager.isWaitingForSelection(chatId)) {
-        console.log(`[${getTimestamp()}] ℹ️ 處於工具選擇狀態，跳過智能指令解析 [聊天: ${chatId}]`);
-    } else {
-        // 載入 SmartCommand 工具
-        const SmartCommand = require('./tools/smart-command');
-        const smartCommand = new SmartCommand({ verbose: false, chatId: chatId });
-        
-        // 解析用戶輸入
-        const parseResult = smartCommand.parse(messageBody);
-        
-        if (parseResult.matched) {
-            console.log(`[${getTimestamp()}] 🧠 智能指令識別: ${parseResult.command} [聊天: ${chatId}]`);
-        
-        // 根據識別的指令執行對應操作
-        switch (parseResult.command) {
-            case 'msg-extractor':
-                // 檢查是否已經啟動
-                if (chatManager.getActivePlugins(chatId).has('msg-extractor')) {
-                    await msg.reply('ℹ️ msg-extractor 已經在運行中');
-                    return;
-                }
-                
-                // 找到 msg-extractor 的索引
-                const msgExtractorIndex = pluginManager.plugins.findIndex(p => p.name === 'msg-extractor');
-                if (msgExtractorIndex !== -1) {
-                    const plugin = await pluginManager.activatePlugin(msgExtractorIndex, chatId);
-                    if (plugin) {
-                        chatManager.addActivePlugin(chatId, 'msg-extractor');
-                        await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n工具：msg-extractor 已啟動`);
-                        console.log(`[${getTimestamp()}] ✅ 智能啟動 msg-extractor [聊天: ${chatId}]`);
-                    }
-                }
-                return;
-                
-            case 'auto-reply':
-                // 檢查是否已經啟動
-                if (chatManager.getActivePlugins(chatId).has('auto-reply')) {
-                    await msg.reply('ℹ️ auto-reply 已經在運行中');
-                    return;
-                }
-                
-                // 找到 auto-reply 的索引
-                const autoReplyIndex = pluginManager.plugins.findIndex(p => p.name === 'auto-reply');
-                if (autoReplyIndex !== -1) {
-                    const plugin = await pluginManager.activatePlugin(autoReplyIndex, chatId);
-                    if (plugin) {
-                        chatManager.addActivePlugin(chatId, 'auto-reply');
-                        await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n工具：auto-reply 已啟動`);
-                        console.log(`[${getTimestamp()}] ✅ 智能啟動 auto-reply [聊天: ${chatId}]`);
-                    }
-                }
-                return;
-                
-            case 'stop':
-                if (chatManager.hasActivePlugins(chatId)) {
-                    const stoppedPlugins = chatManager.stopAllPlugins(chatId);
-                    stoppedPlugins.forEach(pluginName => {
-                        pluginManager.removePluginInstance(pluginName, chatId);
-                    });
-                    await msg.reply(`✅ ${smartCommand.getResponse(parseResult)}\n\n已停止：${stoppedPlugins.join(', ')}`);
-                    console.log(`[${getTimestamp()}] ✅ 智能停止工具：${stoppedPlugins.join(', ')} [聊天: ${chatId}]`);
-                } else {
-                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具');
-                }
-                return;
-                
-            case 'start':
-                const pluginList = pluginManager.getPluginList();
-                await msg.reply(smartCommand.getResponse(parseResult) + '\n' + pluginList);
-                chatManager.setWaitingForSelection(chatId, true);
-                console.log(`[${getTimestamp()}] ✅ 智能顯示選單 [聊天: ${chatId}]`);
-                return;
-                
-            case 'status':
-                const activePlugins = Array.from(chatManager.getActivePlugins(chatId));
-                if (activePlugins.length > 0) {
-                    await msg.reply(`📊 當前運行中的工具：\n${activePlugins.map(p => `• ${p}`).join('\n')}`);
-                } else {
-                    await msg.reply('ℹ️ 當前聊天沒有運行中的工具\n\n輸入「顯示選單」查看可用功能');
-                }
-                console.log(`[${getTimestamp()}] ✅ 智能顯示狀態 [聊天: ${chatId}]`);
-                return;
-
-            case 'weather':
-                // 載入天氣工具
-                const WeatherTool = require('./tools/weather');
-                const weatherTool = new WeatherTool({ verbose: false });
-                
-                // 嘗試從訊息中提取城市名稱
-                let city = 'Hong Kong';
-                const cityPatterns = [
-                    /(香港|台北|東京|倫敦|北京|上海|廣州|深圳|新加坡|紐約|巴黎|悉尼)/,
-                    /weather\s+(?:in|at|for)\s+(\w+)/i,
-                    /(\w+)\s+weather/i
-                ];
-                
-                for (const pattern of cityPatterns) {
-                    const match = messageBody.match(pattern);
-                    if (match) {
-                        const cityMap = {
-                            '香港': 'Hong Kong',
-                            '台北': 'Taipei',
-                            '東京': 'Tokyo',
-                            '倫敦': 'London',
-                            '北京': 'Beijing',
-                            '上海': 'Shanghai',
-                            '廣州': 'Guangzhou',
-                            '深圳': 'Shenzhen',
-                            '新加坡': 'Singapore'
-                        };
-                        city = cityMap[match[1]] || match[1];
-                        break;
-                    }
-                }
-                
-                try {
-                    await msg.reply(`🌤️ 正在查詢 ${city} 的天氣...`);
-                    const weatherInfo = await weatherTool.run(city);
-                    await msg.reply(weatherInfo);
-                    console.log(`[${getTimestamp()}] ✅ 智能查詢天氣: ${city} [聊天: ${chatId}]`);
-                } catch (error) {
-                    await msg.reply(`❌ 查詢天氣失敗: ${error.message}`);
-                    console.error(`[${getTimestamp()}] ❌ 天氣查詢失敗:`, error.message);
-                }
-                return;
-        }
-    }
     }
 
     // ============================================

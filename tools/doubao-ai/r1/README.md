@@ -1,38 +1,23 @@
 # 豆包 AI Tool
 
-使用 OpenCLI 呼叫 Doubao (豆包) AI 的工具。
+透過 OpenCLI 連接豆包 AI，支援自然語言對話。
 
-## 使用方法
+## 功能
 
-### 作為模組使用
+- 自然語言對話
+- 長篇回應支援（60秒超時）
+- 完整回應解析
+
+## 使用方式
+
 ```javascript
 const DoubaoAiTool = require('./tools/doubao-ai/r1');
+const doubao = new DoubaoAiTool({ timeout: 60000 });
 
-const tool = new DoubaoAiTool();
-const response = await tool.ask('你好');
+const response = await doubao.ask('你好');
 console.log(response);
 ```
 
-### 命令列使用
-```bash
-node tools/doubao-ai/r1/index.js "你的問題"
-```
+## 指令
 
-## 需求
-
-- OpenCLI 已安裝並在 PATH 中
-- OpenCLI 已配置豆包 (doubao-app)
-
-## 安裝 OpenCLI
-
-```bash
-git clone https://github.com/jackwener/OpenCLI.git
-cd OpenCLI
-npm install
-npm run build
-```
-
-## 注意事項
-
-- 需要有效的 OpenCLI 安裝
-- 豆包通過 OpenCLI 呼叫，無需額外 API Key
+在 WhatsApp 中輸入 `#你的問題` 即可使用。

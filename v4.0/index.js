@@ -10,9 +10,6 @@ const qrcode = require('qrcode-terminal');
 const path = require('path');
 const fs = require('fs');
 
-// 滑動回覆接口 - 引用根目錄工具
-const slideReplyInterface = require('../tools/slide-reply-interface/r2');
-
 // 常量定義
 const PROJECT_ROOT = __dirname;
 const COMMANDS = {
@@ -160,35 +157,55 @@ class PluginManager {
     }
 
     loadPlugins() {
-        const toolsPath = path.join(PROJECT_ROOT, 'tools');
+        // 從根目錄 tools 載入 (支援 r1/r2 版本結構)
+        const toolsPath = path.join(PROJECT_ROOT, '..', 'tools');
         if (!fs.existsSync(toolsPath)) return;
 
         const items = fs.readdirSync(toolsPath);
         items.forEach(item => {
             const itemPath = path.join(toolsPath, item);
-            if (fs.statSync(itemPath).isDirectory()) {
-                const indexPath = path.join(itemPath, 'index.js');
-                const readmePath = path.join(itemPath, 'README.md');
+            if (fs.statSync(itemPath).isDirectory() && !item.startsWith('.')) {
+                // 檢查是否有版本子目錄 (r1, r2)
+                const versions = ['r2', 'r1']; // 優先使用較新版本
+                let found = false;
+                
+                for (const version of versions) {
+                    const versionPath = path.join(itemPath, version);
+                    const indexPath = path.join(versionPath, 'index.js');
+                    const readmePath = path.join(versionPath, 'README.md');
 
-                if (fs.existsSync(indexPath)) {
-                    let description = '無描述';
-                    if (fs.existsSync(readmePath)) {
-                        const readme = fs.readFileSync(readmePath, 'utf8');
-                        const match = readme.match(/【功能說明】\s*\n\s*(.+)/);
-                        if (match) description = match[1].trim();
+                    if (fs.existsSync(indexPath)) {
+                        let description = '無描述';
+                        if (fs.existsSync(readmePath)) {
+                            const readme = fs.readFileSync(readmePath, 'utf8');
+                            // 嘗試從 README 提取描述（第一個非標題行）
+                            const lines = readme.split('\n');
+                            for (const line of lines) {
+                                const trimmed = line.trim();
+                                // 跳過標題和空行
+                                if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('```')) {
+                                    description = trimmed.substring(0, 50); // 限制長度
+                                    break;
+                                }
+                            }
+                        }
+
+                        this.plugins.push({
+                            name: item,
+                            path: versionPath,
+                            indexPath: indexPath,
+                            description: description,
+                            version: version
+                        });
+                        found = true;
+                        break;
                     }
-
-                    this.plugins.push({
-                        name: item,
-                        path: itemPath,
-                        indexPath: indexPath,
-                        description: description
-                    });
                 }
             }
         });
 
         console.log(`[${getTimestamp()}] 📦 已載入 ${this.plugins.length} 個工具`);
+        this.plugins.forEach(p => console.log(`  • ${p.name} (${p.version}): ${p.description}`));
     }
 
     async activatePlugin(index, chatId) {
@@ -279,7 +296,6 @@ client.on('message_create', async (msg) => {
     // 【v4.2 新指令系統】
     // ! 開頭 = 機器人指令
     // # 開頭 = 豆包 AI 指令
-    // 私聊時只有 # 能觸發豆包 AI
     // ============================================
 
     const isBotCommand = messageBody.startsWith('!');
@@ -287,13 +303,6 @@ client.on('message_create', async (msg) => {
 
     // 豆包 AI 指令處理（# 開頭）
     if (isDoubaoCommand) {
-        // 群組中不處理 # 指令（只有私聊可用）
-        if (chat.isGroup) {
-            console.log(`[${getTimestamp()}] ℹ️ 群組中忽略 # 指令 [聊天: ${chatId}]`);
-            await msg.reply('🤖 *豆包 AI* 僅在私聊中可用\n\n💡 請私聊機器人使用 #你的問題\n💡 群組中請使用 !start 查看機器人功能');
-            return;
-        }
-
         const prompt = messageBody.substring(1).trim();
         
         if (!prompt) {
@@ -308,6 +317,44 @@ client.on('message_create', async (msg) => {
             const DoubaoAiTool = require('../tools/doubao-ai/r1');
             const doubaoTool = new DoubaoAiTool({ verbose: false, timeout: 30000 });
             const response = await doubaoTool.ask(prompt);
+            
+            // 檢查豆包回應是否包含工具指令（如 !weather, !msg-extractor）
+            const toolCommandMatch = response.match(/!([a-zA-Z0-9_-]+)(?:\s+(.+))?/);
+            
+            if (toolCommandMatch) {
+                // 豆包回應包含工具指令，執行該工具
+                const toolName = toolCommandMatch[1].toLowerCase();
+                const toolArgs = toolCommandMatch[2] || '';
+                
+                console.log(`[${getTimestamp()}] 🤖 豆包建議執行工具: ${toolName} [聊天: ${chatId}]`);
+                
+                // 找到對應的工具
+                const pluginIndex = pluginManager.plugins.findIndex(p => p.name.toLowerCase() === toolName);
+                
+                if (pluginIndex !== -1) {
+                    try {
+                        const plugin = await pluginManager.activatePlugin(pluginIndex, chatId);
+                        if (plugin?.instance) {
+                            chatManager.addActivePlugin(chatId, pluginManager.plugins[pluginIndex].name);
+                            
+                            // 如果有參數，直接傳遞給工具執行
+                            if (toolArgs.trim()) {
+                                const result = await plugin.instance.run(toolArgs.trim());
+                                await msg.reply(`🤖 *豆包 AI 建議執行*\n\n${response}\n\n---\n✅ *執行結果*:\n${result}\n\n---\n💡 繼續問: #你的問題\n💡 機器人功能: !start`);
+                            } else {
+                                await msg.reply(`🤖 *豆包 AI 建議執行*\n\n${response}\n\n---\n✅ 已啟動 *${pluginManager.plugins[pluginIndex].name}*\n\n💡 輸入 !狀態 查看運行狀態\n💡 輸入 !stop 停止工具`);
+                            }
+                            
+                            console.log(`[${getTimestamp()}] ✅ 豆包觸發工具執行成功: ${toolName} [聊天: ${chatId}]`);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error(`[${getTimestamp()}] ❌ 豆包觸發工具執行失敗:`, error.message);
+                        await msg.reply(`🤖 *豆包 AI*\n\n${response}\n\n---\n❌ 執行工具失敗: ${error.message}\n\n💡 請手動輸入指令重試`);
+                        return;
+                    }
+                }
+            }
             
             // 限制回應長度
             let replyText = `🤖 *豆包 AI*\n\n${response}\n\n---\n💡 繼續問: #你的問題\n💡 機器人功能: !start`;
@@ -328,26 +375,27 @@ client.on('message_create', async (msg) => {
     if (isBotCommand) {
         const botCommand = messageBody.substring(1).trim().toLowerCase();
 
-        // 發送工具選單函數
+        // 發送工具選單函數（合併為單一訊息）
         async function sendToolMenu() {
-            const sentMessages = [];
             try {
-                await msg.reply('🤖 *機器人功能選單* (v4.2)\n\n📖 *指令說明*\n• !start - 顯示選單\n• !stop - 停止所有功能\n• !狀態 - 查看狀態\n• !工具名 - 啟動工具\n\n🤖 *豆包 AI* (私聊限定)\n• #你的問題 - 問豆包 AI');
-
+                let menuText = '🤖 *機器人功能選單* (v4.2)\n\n';
+                menuText += '📖 *基本指令*\n';
+                menuText += '• !start - 顯示選單\n';
+                menuText += '• !stop - 停止功能\n';
+                menuText += '• !狀態 - 查看狀態\n\n';
+                menuText += '🛠️ *可用工具*\n';
+                
                 for (let i = 0; i < pluginManager.plugins.length; i++) {
                     const plugin = pluginManager.plugins[i];
-                    try {
-                        const toolMessage = `\n${i + 1}. *${plugin.name}*\n   ${plugin.description}\n   💡 輸入 !${plugin.name} 啟動`;
-                        const sentMessage = await msg.reply(toolMessage);
-                        if (sentMessage?.id) {
-                            chatManager.trackMessage(sentMessage.id._serialized, plugin.name, chatId);
-                            sentMessages.push({ id: sentMessage.id._serialized, tool: plugin.name });
-                        }
-                    } catch (sendError) {
-                        console.error(`[${getTimestamp()}] ❌ 發送工具 ${plugin.name} 訊息失敗:`, sendError.message);
-                    }
+                    menuText += `${i + 1}. *${plugin.name}*\n`;
+                    menuText += `   ${plugin.description}\n`;
+                    menuText += `   💡 輸入 !${i + 1} 或 !${plugin.name}\n\n`;
                 }
+                
+                menuText += '🤖 *豆包 AI*\n';
+                menuText += '• #你的問題 - 問豆包 AI';
 
+                await msg.reply(menuText);
                 console.log(`[${getTimestamp()}] ✅ 已發送工具選單 [聊天: ${chatId}]`);
             } catch (error) {
                 console.error(`[${getTimestamp()}] ❌ 發送工具選單失敗:`, error.message);
@@ -358,6 +406,25 @@ client.on('message_create', async (msg) => {
         // 處理機器人指令
         if (botCommand === 'start' || botCommand === '選單' || botCommand === 'menu') {
             await sendToolMenu();
+            return;
+        }
+
+        // 數字指令 !1, !2, !3... 啟動對應工具
+        const toolIndex = parseInt(botCommand) - 1;
+        if (!isNaN(toolIndex) && toolIndex >= 0 && toolIndex < pluginManager.plugins.length) {
+            try {
+                const plugin = await pluginManager.activatePlugin(toolIndex, chatId);
+                if (plugin?.instance) {
+                    chatManager.addActivePlugin(chatId, pluginManager.plugins[toolIndex].name);
+                    await msg.reply(`✅ 已啟動 *${pluginManager.plugins[toolIndex].name}*\n\n📋 功能：${plugin.description}\n\n💡 輸入 !狀態 查看運行狀態\n💡 輸入 !stop 停止工具`);
+                    console.log(`[${getTimestamp()}] ✅ 啟動工具成功: ${pluginManager.plugins[toolIndex].name} [聊天: ${chatId}]`);
+                } else {
+                    await msg.reply(`❌ 啟動工具失敗：工具實例創建失敗\n\n💡 輸入 !start 查看可用工具`);
+                }
+            } catch (error) {
+                await msg.reply(`❌ 啟動工具失敗：${error.message}\n\n💡 輸入 !start 查看可用工具`);
+                console.error(`[${getTimestamp()}] ❌ 啟動工具失敗:`, error.message);
+            }
             return;
         }
 
